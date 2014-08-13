@@ -682,15 +682,23 @@ S180:
     return ignpoi;
 }
 
+float BoxMuller()
+{
+  float u0=rnd(), u1=rnd();
+  float r=sqrt(-2*log(u0));
+  float theta=2*3.1415926535*u1;
+  return r*sin(theta);
+}
 /*-----------------------------------*/
 float RNormal(float mu,float sd)
 /* Returns Normal rv with mean mu, variance sigsq.
    Uses snorm function of Brown and Lovato.  By JKP*/
 {
 
-    return (mu + sd*snorm());
+    return (mu + sd*BoxMuller());
 
 }
+
 /*
 **********************************************************************
 

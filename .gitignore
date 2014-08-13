@@ -27,3 +27,4 @@
 
 seed.txt
 testdata*.out_f
+*.out_f

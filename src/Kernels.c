@@ -12,7 +12,7 @@
 #include "structure.h"
 
 #define MAX_SOURCE_SIZE (0x100000)
-#define USEGPU 0
+#define USEGPU 1
 
 
 void printCLErr(cl_int err)

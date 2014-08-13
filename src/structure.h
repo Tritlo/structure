@@ -3,7 +3,7 @@
 #define VERSION "2.3.4 (Jul 2012)"
 
 /*Mechanics of the program, should not need to be changed. */
-#define UNDERFLO   1e-100 /*DBL_MIN*1.1*/   /*Get worried about numbers that are smaller than this */
+#define UNDERFLO   1e-40 /*DBL_MIN*1.1*/   /*Get worried about numbers that are smaller than this */
 #define STOREFREQ  1        /*frequency of recording the likelihood */
 #define UNASSIGNED -9       /*missing Data are placed in this population. Should be <0 */
 #define STRLEN     200      /* max length of string used to store data file name */
