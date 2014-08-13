@@ -19,7 +19,7 @@ float FlikeFreqsDiffMap (float newfrac,float oldfrac,
     float sum;
 
     if (NumAlleles[loc]==0) {
-        return -(lgamma(newfrac) - lgamma(oldfrac)); /* should not be counting sites with all missing data */
+        return (lgamma(oldfrac) + lgamma(newfrac)); /* should not be counting sites with all missing data */
     } else {
         sum = 0.0;
         for (allele=0; allele < NumAlleles[loc]; allele++) {
@@ -27,8 +27,8 @@ float FlikeFreqsDiffMap (float newfrac,float oldfrac,
             logp = log(P[PPos(loc,pop,allele)]);
             sum += newfrac*eps*logp;
             sum -= oldfrac*eps*logp;
-            sum -= lgamma( newfrac*eps);
             sum += lgamma( oldfrac*eps);
+            sum -= lgamma( newfrac*eps);
         }
         return sum;
     }
