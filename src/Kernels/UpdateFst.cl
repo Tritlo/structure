@@ -17,18 +17,40 @@ float FlikeFreqsDiffMap (float newfrac,float oldfrac,
     int allele;
     float eps,logp;
     float sum;
+    float c, y,t;
 
     if (NumAlleles[loc]==0) {
         return (lgamma(oldfrac) + lgamma(newfrac)); /* should not be counting sites with all missing data */
     } else {
         sum = 0.0;
+        c = 0.0;
         for (allele=0; allele < NumAlleles[loc]; allele++) {
             eps = Epsilon[EpsPos (loc, allele)];
             logp = log(P[PPos(loc,pop,allele)]);
-            sum += newfrac*eps*logp;
-            sum -= oldfrac*eps*logp;
-            sum += lgamma( oldfrac*eps);
-            sum -= lgamma( newfrac*eps);
+
+            /* sum += newfrac*eps*logp; */
+            y =  newfrac*eps*logp - c;
+            t = sum + y;
+            c = (t-sum) -y;
+            sum = t;
+
+            /* sum -= oldfrac*eps*logp; */
+            y = -oldfrac*eps*logp - c;
+            t = sum + y;
+            c = (t-sum) -y;
+            sum = t;
+
+            /* sum += lgamma( oldfrac*eps); */
+            y = lgamma( oldfrac*eps) - c;
+            t = sum + y;
+            c = (t-sum) -y;
+            sum = t;
+
+            /* sum -= lgamma( newfrac*eps); */
+            y = -lgamma( newfrac*eps) - c;
+            t = sum + y;
+            c = (t-sum) -y;
+            sum = t;
         }
         return sum;
     }
@@ -67,8 +89,13 @@ __kernel void UpdateFst(
             c = 0.0;
             while( loc < NUMLOCI){
                 float elem = 0.0;
+                float d = 0.0;
+                float z,u;
                 for(redpop = pop; redpop < numredpops; redpop++){
-                    elem += FlikeFreqsDiffMap(newfrac,oldfrac,Epsilon,P,NumAlleles,loc,redpop);
+                    z = FlikeFreqsDiffMap(newfrac,oldfrac,Epsilon,P,NumAlleles,loc,redpop) - d;
+                    u = elem + z;
+                    d = (u - elem) -z;
+                    elem = u;
                 }
                 /* Kahan summation */
                 y = elem - c;

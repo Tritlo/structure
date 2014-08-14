@@ -185,12 +185,20 @@ float mapLogLikeFunc(__global float *Q, __global float *P,
     if (ind < NUMINDS && loc < NUMLOCI){
         float runningtotal = 1.0;
         float logterm = 0.0;
+        float c = 0.0;
+        float y,t;
         for (line = 0; line < LINES; line++) {
             allele = Geno[GenPos (ind, line, loc)];
             if (allele != MISSING) {
                 term = 0.0;
+                float d = 0.0;
+                float z,u;
                 for (pop = 0; pop < MAXPOPS; pop++) {
-                    term += Q[QPos(ind,pop)] * P[PPos (loc, pop, allele)];
+
+                    z = Q[QPos(ind,pop)] * P[PPos (loc, pop, allele)] - d;
+                    u = term + z;
+                    d = (u - term) - z;
+                    term = u;
                 }
 
                 //TODO: Evaluate underflow safe vs nonsafe
@@ -206,7 +214,10 @@ float mapLogLikeFunc(__global float *Q, __global float *P,
                     runningtotal = 1.0;
                 }*/
                 //Might underflow?
-                logterm += log(term);
+                y = log(term) - c;
+                t = logterm + y;
+                c = (t - logterm) -y;
+                logterm = t;
             }
         }
         logterm += log(runningtotal);
