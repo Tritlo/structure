@@ -18,6 +18,7 @@ __kernel void UpdateAlpha(
        const int POPFLAGINDS)
 {
     int alpha = get_global_id(1);
+    float c, y, t, input; // KahanSum
     while( alpha < NUMALPHAS){
         int ind = get_global_id(0);
         if(ind < NUMINDS){
@@ -33,6 +34,7 @@ __kernel void UpdateAlpha(
                 //TODO: Evaluate underflow safe vs nonsafe
                 float sum = 1.0;
                 float total = 0.0;
+                c = 0.0;
                 while( ind < NUMINDS){
                     if (!((USEPOPINFO) && (popflags[ind]))) {
                         //Safe version (similar to in code)
@@ -48,17 +50,22 @@ __kernel void UpdateAlpha(
                             sum *= SQUNDERFLO;
                         }
                         if(sum < SQUNDERFLO){
-                            total += log(sum);
+                            y = log(sum)- c;
+                            t = total + y;
+                            c = (t-total) - y;
+                            total = t;
                             sum = 1.0;
                         }
                         //Might underflow?
-                      /*float elem = 0.0;
-                        for(redpop = alpha; redpop < numredpops; redpop++){
-                            elem += log(Q[QPos (ind, redpop)]);
-                        }
+                        /* float elem = 0.0; */
+                        /* for(redpop = alpha; redpop < numredpops; redpop++){ */
+                        /*     elem += log(Q[QPos (ind, redpop)]); */
+                        /* } */
+                        /* y = elem - c; */
+                        /* t = total + y; */
+                        /* c = (t-total) - y; */
+                        /* total = t; */
 
-                        total += elem;
-                      */
                         ind += get_global_size(0);
                     }
                 }
@@ -70,13 +77,20 @@ __kernel void UpdateAlpha(
                 scratch[localId] = total;
                 barrier(CLK_LOCAL_MEM_FENCE);
                 int devs = get_local_size(0);
+                c = 0.0;
                 for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
                     if(localId < offset){
-                        scratch[localId] += scratch[localId + offset];
+                        y = scratch[localId + offset] - c;
+                        t = scratch[localId] + y;
+                        c = (t-scratch[localId]) - y;
+                        scratch[localId] = t;
                     }
                     //Handle if were not working on a multiple of 2
                     if (localId == 0 && (devs-1)/2 == offset){
-                        scratch[localId] += scratch[devs-1];
+                        y = scratch[devs-1] - c;
+                        t = scratch[localId] + y;
+                        c = (t-scratch[localId]) - y;
+                        scratch[localId] = t;
                     }
 
                     devs >>= 1;

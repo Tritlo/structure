@@ -48,6 +48,7 @@ __kernel void UpdateFst(
 {
     int pop = get_global_id(1);
     int numgroups = get_num_groups(0);
+    float c, y, t;// KahanSum
     while (pop < MAXPOPS){
         int loc = get_global_id(0);
         float newf = normals[pop];
@@ -63,12 +64,17 @@ __kernel void UpdateFst(
             if (ONEFST) numredpops = MAXPOPS;
             /* idempotent */
             /* Map and partial reduce */
+            c = 0.0;
             while( loc < NUMLOCI){
                 float elem = 0.0;
                 for(redpop = pop; redpop < numredpops; redpop++){
                     elem += FlikeFreqsDiffMap(newfrac,oldfrac,Epsilon,P,NumAlleles,loc,redpop);
                 }
-                sum += elem;
+                /* Kahan summation */
+                y = elem - c;
+                t = sum + y;
+                c = (t - sum) -y;
+                sum = t;
                 loc += get_global_size(0);
             }
             /* reduce locally */
@@ -76,13 +82,21 @@ __kernel void UpdateFst(
             scratch[localLoc] = sum;
             barrier(CLK_LOCAL_MEM_FENCE);
             int devs = get_local_size(0);
+            c = 0.0;
             for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
                 if(localLoc < offset){
-                    scratch[localLoc] += scratch[localLoc + offset];
+                     y = scratch[localLoc + offset] -c;
+                     t = scratch[localLoc] + y;
+                     c = (t-scratch[localLoc]) -y;
+                     scratch[localLoc] = t;
+
                 }
                 //Handle if were not working on a multiple of 2
                 if (localLoc == 0 && (devs-1)/2 == offset){
-                    scratch[localLoc] += scratch[devs-1];
+                     y = scratch[devs-1] -c;
+                     t = scratch[localLoc] + y;
+                     c = (t-scratch[localLoc]) -y;
+                     scratch[localLoc] = t;
                 }
                 devs >>= 1;
                 barrier(CLK_LOCAL_MEM_FENCE);

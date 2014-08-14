@@ -121,10 +121,15 @@ __kernel void mapReduceLogDiffs(__global float *Q,
     int numgroups = get_num_groups(0);
     /* idempotent */
     float logdiff = 0.0;
+    float c,y,t;
     /* Map and partial reduce */
+    c = 0.0;
     while( loc < NUMLOCI){
         float elem = mapLogDiffsFunc(Q,TestQ,P,Geno,ind,loc);
-        logdiff += elem;
+        y = elem -c;
+        t = logdiff+y;
+        c = (t - logdiff) - y;
+        logdiff = t;
         loc += get_global_size(0);
     }
 
@@ -133,14 +138,23 @@ __kernel void mapReduceLogDiffs(__global float *Q,
     scratch[localLoc] = logdiff;
     barrier(CLK_LOCAL_MEM_FENCE);
     int devs = get_local_size(0);
+    c = 0.0;
     for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
+
         if(localLoc < offset){
-            scratch[localLoc] += scratch[localLoc + offset];
+            y = scratch[localLoc + offset] - c;
+            t = scratch[localLoc] + y;
+            c = (t-scratch[localLoc]) - y;
+            scratch[localLoc] = t;
         }
         //Handle if were not working on a multiple of 2
         if (localLoc == 0 && (devs-1)/2 == offset){
-            scratch[localLoc] += scratch[devs-1];
+            y = scratch[devs-1] - c;
+            t = scratch[localLoc] + y;
+            c = (t-scratch[localLoc]) - y;
+            scratch[localLoc] = t;
         }
+
         devs >>= 1;
         barrier(CLK_LOCAL_MEM_FENCE);
     }
@@ -213,12 +227,18 @@ __kernel void mapReduceLogLike(__global float *Q,
     int numgroups = get_num_groups(0);
     /* idempotent */
     float logterm = 0.0;
+    float c,y,t;
     /* Map and partial reduce */
     /* clear results buffer */
+
     if (ind < NUMINDS && loc < NUMLOCI){
+        c = 0.0;
         while( loc < NUMLOCI){
             float elem = mapLogLikeFunc(Q,P,Geno,ind,loc);
-            logterm += elem;
+            y = elem - c;
+            t = logterm + y;
+            c = (t - logterm) - y;
+            logterm = t;
             loc += get_global_size(0);
         }
 
@@ -227,14 +247,22 @@ __kernel void mapReduceLogLike(__global float *Q,
         scratch[localLoc] = logterm;
         barrier(CLK_LOCAL_MEM_FENCE);
         int devs = get_local_size(0);
+        c = 0.0;
         for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
             if(localLoc < offset){
-                scratch[localLoc] += scratch[localLoc + offset];
+                y = scratch[localLoc + offset] - c;
+                t = scratch[localLoc] + y;
+                c = (t-scratch[localLoc]) - y;
+                scratch[localLoc] = t;
             }
             //Handle if were not working on a multiple of 2
             if (localLoc == 0 && (devs-1)/2 == offset){
-                scratch[localLoc] += scratch[devs-1];
+                y = scratch[devs-1] - c;
+                t = scratch[localLoc] + y;
+                c = (t-scratch[localLoc]) - y;
+                scratch[localLoc] = t;
             }
+
             devs >>= 1;
             barrier(CLK_LOCAL_MEM_FENCE);
         }
@@ -272,8 +300,10 @@ __kernel void CalcLike(
 
     float logterm = 0.0;
     int numgroups = get_num_groups(0);
+    float c,y,t;
 
     /* Map and partial reduce */
+    c = 0.0;
     while( ind < NUMINDS){
         float elem = loglikes[ind];
         if (usesumindlike) {
@@ -282,7 +312,10 @@ __kernel void CalcLike(
             }
             sumindlike[ind] += exp(elem-indlike_norm[ind]);
         }
-        logterm += elem;
+        y = elem - c;
+        t = logterm + y;
+        c = (t - logterm) - y;
+        logterm = t;
         ind += get_global_size(0);
     }
 
@@ -290,14 +323,22 @@ __kernel void CalcLike(
     scratch[localLoc] = logterm;
     barrier(CLK_LOCAL_MEM_FENCE);
     int devs = get_local_size(0);
+    c = 0.0;
     for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
         if(localLoc < offset){
-            scratch[localLoc] += scratch[localLoc + offset];
+            y = scratch[localLoc + offset] - c;
+            t = scratch[localLoc] + y;
+            c = (t-scratch[localLoc]) - y;
+            scratch[localLoc] = t;
         }
         //Handle if were not working on a multiple of 2
         if (localLoc == 0 && (devs-1)/2 == offset){
-            scratch[localLoc] += scratch[devs-1];
+            y = scratch[devs-1] - c;
+            t = scratch[localLoc] + y;
+            c = (t-scratch[localLoc]) - y;
+            scratch[localLoc] = t;
         }
+
         devs >>= 1;
         barrier(CLK_LOCAL_MEM_FENCE);
     }
