@@ -27,19 +27,19 @@ __kernel void UpdateAlpha(
 
             float newalpha = norms[alpha];
             float oldalpha = Alpha[alpha];
-            float alphasum =0.0;
+            float alphasum =0.0f;
 
             if ((newalpha > 0) && ((newalpha < ALPHAMAX) || (!(UNIFPRIORALPHA)) ) ) {
                 if (POPALPHAS){ numredpops = alpha +1; }
                 //TODO: Evaluate underflow safe vs nonsafe
-                float sum = 1.0;
-                float total = 0.0;
-                c = 0.0;
+                float sum = 1.0f;
+                float total = 0.0f;
+                c = 0.0f;
                 while( ind < NUMINDS){
                     if (!((USEPOPINFO) && (popflags[ind]))) {
                         //Safe version (similar to in code)
                         //Watching out for underflow
-                        float elem = 1.0;
+                        float elem = 1.0f;
                         for(redpop = alpha; redpop < numredpops; redpop++){
                             elem *= Q[QPos (ind, redpop)];
                         }
@@ -54,10 +54,10 @@ __kernel void UpdateAlpha(
                             t = total + y;
                             c = (t-total) - y;
                             total = t;
-                            sum = 1.0;
+                            sum = 1.0f;
                         }
                         //Might underflow?
-                        /* float elem = 0.0; */
+                        /* float elem = 0.0f; */
                         /* for(redpop = alpha; redpop < numredpops; redpop++){ */
                         /*     elem += log(Q[QPos (ind, redpop)]); */
                         /* } */
@@ -77,7 +77,7 @@ __kernel void UpdateAlpha(
                 scratch[localId] = total;
                 barrier(CLK_LOCAL_MEM_FENCE);
                 int devs = get_local_size(0);
-                c = 0.0;
+                c = 0.0f;
                 for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
                     if(localId < offset){
                         y = scratch[localId + offset] - c;
@@ -113,8 +113,8 @@ __kernel void UpdateAlpha(
                     for (int i=0; i<MAXPOPS; i++)  {
                         alphasum += Alpha[i];
                     }
-                    float logprobdiff = 0.0;
-                    float logterm = 0.0;
+                    float logprobdiff = 0.0f;
+                    float logterm = 0.0f;
                     if (!(UNIFPRIORALPHA)) logprobdiff = AlphaPriorDiff (newalpha, oldalpha);
 
                     for(int id =0; id < numgroups; id++){
@@ -124,8 +124,8 @@ __kernel void UpdateAlpha(
 
                     int multiple = numredpops - alpha;
                     float lpsum = (newalpha - oldalpha) * logterm;
-                    /*lpsum -= (oldalpha - 1.0) * logterm;
-                      lpsum += (newalpha - 1.0) * logterm;*/
+                    /*lpsum -= (oldalpha - 1.0f) * logterm;
+                      lpsum += (newalpha - 1.0f) * logterm;*/
 
                     float sumalphas = alphasum;
                     if (POPALPHAS){

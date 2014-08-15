@@ -22,8 +22,8 @@ float FlikeFreqsDiffMap (float newfrac,float oldfrac,
     if (NumAlleles[loc]==0) {
         return (lgamma(oldfrac) + lgamma(newfrac)); /* should not be counting sites with all missing data */
     } else {
-        sum = 0.0;
-        c = 0.0;
+        sum = 0.0f;
+        c = 0.0f;
         for (allele=0; allele < NumAlleles[loc]; allele++) {
             eps = Epsilon[EpsPos (loc, allele)];
             logp = log(P[PPos(loc,pop,allele)]);
@@ -75,21 +75,21 @@ __kernel void UpdateFst(
         int loc = get_global_id(0);
         float newf = normals[pop];
         /* ensure newf is large enough so we don't cause over/underflow */
-        if (newf > 10e-5 && newf < 1.0){
-            float sum = 0.0;
+        if (newf > 10e-5 && newf < 1.0f){
+            float sum = 0.0f;
             int redpop;
             int numredpops;
             float oldf = Fst[pop];
-            float newfrac = (1.0-newf)/newf;
-            float oldfrac = (1.0-oldf)/oldf;
+            float newfrac = (1.0f-newf)/newf;
+            float oldfrac = (1.0f-oldf)/oldf;
             numredpops = pop +1;
             if (ONEFST) numredpops = MAXPOPS;
             /* idempotent */
             /* Map and partial reduce */
-            c = 0.0;
+            c = 0.0f;
             while( loc < NUMLOCI){
-                float elem = 0.0;
-                float d = 0.0;
+                float elem = 0.0f;
+                float d = 0.0f;
                 float z,u;
                 for(redpop = pop; redpop < numredpops; redpop++){
                     z = FlikeFreqsDiffMap(newfrac,oldfrac,Epsilon,P,NumAlleles,loc,redpop) - d;
@@ -109,7 +109,7 @@ __kernel void UpdateFst(
             scratch[localLoc] = sum;
             barrier(CLK_LOCAL_MEM_FENCE);
             int devs = get_local_size(0);
-            c = 0.0;
+            c = 0.0f;
             for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
                 if(localLoc < offset){
                      y = scratch[localLoc + offset] -c;
@@ -149,7 +149,7 @@ __kernel void UpdateFst(
                     logprobdiff += results[pop*numgroups + id];
                     results[pop*numgroups + id] = 0;
                 }
-                if (logprobdiff >= 0.0 || rndDisc(randState) < exp(logprobdiff)) {   /*accept new f */
+                if (logprobdiff >= 0.0f || rndDisc(randState) < exp(logprobdiff)) {   /*accept new f */
                     for(redpop = pop; redpop < numredpops; redpop++){
                         Fst[redpop] = newf;
                     }

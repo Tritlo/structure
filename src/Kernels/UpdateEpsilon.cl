@@ -34,11 +34,11 @@ __kernel void NonIndUpdateEpsilon(
             eps2 = Epsilon[EpsPos(loc,allele2)];
             diff = numToRange(0,invsqrtnuminds,rndDisc(randState));
 
-            if(eps1 + diff < 1.0 && eps2 - diff > 0.0){
+            if(eps1 + diff < 1.0f && eps2 - diff > 0.0f){
                 //TODO: Evaluate whether we should reduce here.
-                sum=0.0;
+                sum=0.0f;
                 for (pop=0; pop<MAXPOPS; pop++) { /*compute likelihood ratio*/
-                    float frac = (1.0-Fst[pop])/Fst[pop];
+                    float frac = (1.0f-Fst[pop])/Fst[pop];
                     sum += lgamma(frac*eps1);
                     sum += lgamma(frac*eps2);
                     sum -= lgamma(frac*(eps1+diff));
@@ -47,13 +47,13 @@ __kernel void NonIndUpdateEpsilon(
                     sum += frac*diff*log(P[PPos(loc, pop, allele1)]);
                     sum -= frac*diff*log(P[PPos(loc, pop, allele2)]);
                 }
-                if (lambda != 1.0) {              /*compute prior ratio*/
+                if (lambda != 1.0f) {              /*compute prior ratio*/
                     /* as it is in code */
                     /*float ratio = (eps1 + diff)* (eps2 - diff)/(eps1)/(eps2)*/
-                    /*sum += log(pow(ratio, lambda-1.0));*/
+                    /*sum += log(pow(ratio, lambda-1.0f));*/
                     /* as it probably should be ? */
                     float ratio = (eps1 + diff)* (eps2 - diff)/(eps1*eps2);
-                    sum += (lambda-1.0)*log(ratio);
+                    sum += (lambda-1.0f)*log(ratio);
                 }
 
                 if (rndDisc(randState) < exp(sum)){

@@ -76,7 +76,7 @@ __kernel void UpdQDirichlet(
             float GammaSample[MAXPOPS];
 
             int i = 0;
-            float sum = 0.0;
+            float sum = 0.0f;
             int offset = ind*MAXPOPS;
             float param;
             for(i = 0; i < MAXPOPS; i++){

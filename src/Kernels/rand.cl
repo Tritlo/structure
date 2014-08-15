@@ -13,7 +13,7 @@ __kernel void Dirichlet(
         float GammaSample[MAXPOPS];
 
         int i = 0;
-        float sum = 0.0;
+        float sum = 0.0f;
         int offset = ind*MAXPOPS;
         for(i = 0; i < MAXPOPS; i++){
             GammaSample[i] = RGammaDisc(Parameters[i],1,randState);

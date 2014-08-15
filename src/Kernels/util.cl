@@ -218,37 +218,37 @@ float RGammaBest(float a,RndDiscState *randState){
 float RGammaLargerThanOne(float n, RndDiscState *randState)
 {
     float aa,w,x;
-    float nprev=0.0;
-    float c1=0.0;
-    float c2=0.0;
-    float c3=0.0;
-    float c4=0.0;
-    float c5=0.0;
+    float nprev=0.0f;
+    float c1=0.0f;
+    float c2=0.0f;
+    float c3=0.0f;
+    float c4=0.0f;
+    float c5=0.0f;
     float u1;
     float u2;
     /*if(n!=nprev) {*/
-        c1=n-1.0;
-        aa=1.0/c1;
+        c1=n-1.0f;
+        aa=1.0f/c1;
         c2=aa*(n-1/(6*n));
         c3=2*aa;
         c4=c3+2;
-        if(n>2.5) {
+        if(n>2.5f) {
             c5=1/sqrt(n);
         }
     /*}*/
 four:
     u1=rndDisc(randState);
     u2=rndDisc(randState);
-    if(n<=2.5) {
+    if(n<=2.5f) {
         goto five;
     }
-    u1=u2+c5*(1-1.86*u1);
+    u1=u2+c5*(1-1.86f*u1);
     if ((u1<=0) || (u1>=1)) {
         goto four;
     }
 five:
     w=c2*u2/u1;
-    if(c3*u1+w+1.0/w < c4) {
+    if(c3*u1+w+1.0f/w < c4) {
         goto six;
     }
     if(c3*log(u1)-log(w)+w >=1) {
@@ -266,10 +266,10 @@ six:
 
 float RGammaDisc(float n,float lambda,RndDiscState *randState)
 {
-    float x=0.0;
+    float x=0.0f;
     if(n<1) {
         x = RGammaDiscFloat(n,randState);
-    } else if(n==1.0) {
+    } else if(n==1.0f) {
         /* gamma (1,1) is an exponential dist */
         /*x = RGammaDiscOne(randState);*/
         x = -log(rndDisc(randState));
@@ -305,9 +305,9 @@ float RGammaDisc(float n,float lambda,RndDiscState *randState)
 void RDirichletDisc(float * a, int k, float * b,RndDiscState *randState)
 {
     int i;
-    float sum=0.0;
+    float sum=0.0f;
     float c,y,t;
-    c = 0.0;
+    c = 0.0f;
     for(i=0; i<k; i++) {
         b[i]=RGammaDisc(a[i],1,randState);
         y = b[i] - c;
@@ -325,7 +325,7 @@ float LogRGammaDisc(float n, float lambda, RndDiscState *randState)
 {
     float v0, v[3], E=2.71828182, em, logem, lognm;
     int i;
-    if (n >= 1.0) {
+    if (n >= 1.0f) {
         return log(RGammaDisc(n, lambda,randState));
     }
     v0 = E/(E+n);
@@ -335,11 +335,11 @@ float LogRGammaDisc(float n, float lambda, RndDiscState *randState)
         }
 
         if (v[0] <= v0) {
-            logem = 1.0/n*log(v[1]);
+            logem = 1.0f/n*log(v[1]);
             em = exp(logem);
             lognm = log(v[2])+(n-1)*logem;
         } else {
-            em = 1.0-log(v[1]);
+            em = 1.0f-log(v[1]);
             logem = log(em);
             lognm = log(v[2]) - em;
         }
@@ -354,10 +354,10 @@ void LogRDirichletDisc (float *a, int k,__global float *b,
                         RndDiscState *randState)
 {
     int i;
-    float sum = 0.0;
+    float sum = 0.0f;
     /* float sum2; */
     float c,y,t;
-    c = 0.0;
+    c = 0.0f;
     for (i = 0; i < k; i++) {
         b[i] =RGammaDisc (a[i], 1,randState);
         y = b[i] - c;

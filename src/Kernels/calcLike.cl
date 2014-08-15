@@ -60,13 +60,13 @@ float mapLogDiffsFunc(__global float *Q, __global float *TestQ,
     float termP;
     float termM;
     if (ind < NUMINDS && loc < NUMLOCI){
-        float runningtotalP = 1.0, runningtotalM = 1.0;
-        float logtermP = 0.0, logtermM = 0.0;
+        float runningtotalP = 1.0f, runningtotalM = 1.0f;
+        float logtermP = 0.0f, logtermM = 0.0f;
         for (line = 0; line < LINES; line++) {
             allele = Geno[GenPos (ind, line, loc)];
             if (allele != MISSING) {
-                termP = 0.0;
-                termM = 0.0;
+                termP = 0.0f;
+                termM = 0.0f;
                 for (pop = 0; pop < MAXPOPS; pop++) {
                     termP += TestQ[QPos(ind,pop)] * P[PPos (loc, pop, allele)];
                     termM += Q[QPos(ind,pop)] * P[PPos (loc, pop, allele)];
@@ -81,7 +81,7 @@ float mapLogDiffsFunc(__global float *Q, __global float *TestQ,
                 }
                 if (runningtotalP < SQUNDERFLO){
                     logtermP += log(runningtotalP);
-                    runningtotalP = 1.0;
+                    runningtotalP = 1.0f;
                 }
 
                 if (termM > SQUNDERFLO) {
@@ -91,7 +91,7 @@ float mapLogDiffsFunc(__global float *Q, __global float *TestQ,
                 }
                 if (runningtotalM < SQUNDERFLO){
                     logtermM += log(runningtotalM);
-                    runningtotalM = 1.0;
+                    runningtotalM = 1.0f;
                 }*/
                 //Might underflow?
                 logtermP += log(termP);
@@ -103,7 +103,7 @@ float mapLogDiffsFunc(__global float *Q, __global float *TestQ,
 
         return logtermP - logtermM;
     }
-    return 0.0;
+    return 0.0f;
 }
 
 
@@ -121,10 +121,10 @@ __kernel void mapReduceLogDiffs(__global float *Q,
         int numgroups = get_num_groups(0);
         int loc = get_global_id(0);
         /* idempotent */
-        float logdiff = 0.0;
+        float logdiff = 0.0f;
         float c,y,t;
         /* Map and partial reduce */
-        c = 0.0;
+        c = 0.0f;
         while( loc < NUMLOCI){
             float elem = mapLogDiffsFunc(Q,TestQ,P,Geno,ind,loc);
             y = elem -c;
@@ -139,7 +139,7 @@ __kernel void mapReduceLogDiffs(__global float *Q,
         scratch[localLoc] = logdiff;
         barrier(CLK_LOCAL_MEM_FENCE);
         int devs = get_local_size(0);
-        c = 0.0;
+        c = 0.0f;
         for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
 
             if(localLoc < offset){
@@ -186,15 +186,15 @@ float mapLogLikeFunc(__global float *Q, __global float *P,
     int allele, line, pop;
     float term;
     if (ind < NUMINDS && loc < NUMLOCI){
-        float runningtotal = 1.0;
-        float logterm = 0.0;
-        float c = 0.0;
+        float runningtotal = 1.0f;
+        float logterm = 0.0f;
+        float c = 0.0f;
         float y,t;
         for (line = 0; line < LINES; line++) {
             allele = Geno[GenPos (ind, line, loc)];
             if (allele != MISSING) {
-                term = 0.0;
-                float d = 0.0;
+                term = 0.0f;
+                float d = 0.0f;
                 float z,u;
                 for (pop = 0; pop < MAXPOPS; pop++) {
 
@@ -214,7 +214,7 @@ float mapLogLikeFunc(__global float *Q, __global float *P,
                 }
                 if (runningtotal < SQUNDERFLO){
                     logterm += log(runningtotal);
-                    runningtotal = 1.0;
+                    runningtotal = 1.0f;
                 }*/
                 //Might underflow?
                 y = log(term) - c;
@@ -226,7 +226,7 @@ float mapLogLikeFunc(__global float *Q, __global float *P,
         logterm += log(runningtotal);
         return logterm;
     }
-    return 0.0;
+    return 0.0f;
 }
 
 __kernel void mapReduceLogLike(__global float *Q,
@@ -241,13 +241,13 @@ __kernel void mapReduceLogLike(__global float *Q,
         int loc = get_global_id(0);
         int numgroups = get_num_groups(0);
         /* idempotent */
-        float logterm = 0.0;
+        float logterm = 0.0f;
         float c,y,t;
         /* Map and partial reduce */
         /* clear results buffer */
 
         if (ind < NUMINDS && loc < NUMLOCI){
-            c = 0.0;
+            c = 0.0f;
             while( loc < NUMLOCI){
                 float elem = mapLogLikeFunc(Q,P,Geno,ind,loc);
                 y = elem - c;
@@ -262,7 +262,7 @@ __kernel void mapReduceLogLike(__global float *Q,
             scratch[localLoc] = logterm;
             barrier(CLK_LOCAL_MEM_FENCE);
             int devs = get_local_size(0);
-            c = 0.0;
+            c = 0.0f;
             for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
                 if(localLoc < offset){
                     y = scratch[localLoc + offset] - c;
@@ -315,16 +315,16 @@ __kernel void CalcLike(
 {
     int ind = get_global_id(0);
 
-    float logterm = 0.0;
+    float logterm = 0.0f;
     int numgroups = get_num_groups(0);
     float c,y,t;
 
     /* Map and partial reduce */
-    c = 0.0;
+    c = 0.0f;
     while( ind < NUMINDS){
         float elem = loglikes[ind];
         if (usesumindlike) {
-            if (indlike_norm[ind]==0.0) {
+            if (indlike_norm[ind]==0.0f) {
                 indlike_norm[ind] = elem;
             }
             sumindlike[ind] += exp(elem-indlike_norm[ind]);
@@ -340,7 +340,7 @@ __kernel void CalcLike(
     scratch[localLoc] = logterm;
     barrier(CLK_LOCAL_MEM_FENCE);
     int devs = get_local_size(0);
-    c = 0.0;
+    c = 0.0f;
     for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
         if(localLoc < offset){
             y = scratch[localLoc + offset] - c;

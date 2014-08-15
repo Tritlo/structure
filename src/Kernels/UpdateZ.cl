@@ -28,7 +28,7 @@ __kernel void UpdateZ (
                     Z[ZPos (ind, line, loc)] = UNASSIGNED;
                 } else {
                     /*Data present */
-                    sum = 0.0;    /*compute prob of each allele being from each pop */
+                    sum = 0.0f;    /*compute prob of each allele being from each pop */
                     for (pop = 0; pop < MAXPOPS; pop++) {
                         Cutoffs[pop] = Q[QPos (ind, pop)] * P[PPos (loc, pop, allele)];
                         sum += Cutoffs[pop];
