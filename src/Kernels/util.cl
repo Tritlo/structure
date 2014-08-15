@@ -203,7 +203,7 @@ float RGammaBest(float a,RndDiscState *randState){
         U = rndDisc(randState);
         V = rndDisc(randState);
         W = U*(1-U);
-        Y = sqrt((c/W))*(U-0.5);
+        Y = sqrt((c/W))*(U-0.5f);
         X = b + Y;
         if( X >= 0){
             Z = 64*(W*W*W)*(V*V);
@@ -323,7 +323,7 @@ void RDirichletDisc(float * a, int k, float * b,RndDiscState *randState)
 /* Melissa's version, adapted from an algorithm on wikipedia.  January 08 */
 float LogRGammaDisc(float n, float lambda, RndDiscState *randState)
 {
-    float v0, v[3], E=2.71828182, em, logem, lognm;
+    float v0, v[3], E=2.71828182f, em, logem, lognm;
     int i;
     if (n >= 1.0f) {
         return log(RGammaDisc(n, lambda,randState));

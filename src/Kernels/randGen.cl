@@ -3,7 +3,7 @@
 #define MAXRANDVAL 4294967296
 
 #define RANDSPERSTREAM 2147483648
-#define PI 3.14159265359
+#define PI 3.14159265359f
 
 mwc64x_state_t getRandGen(__global uint *randGens, int id){
     /*mwc64x_state_t rng = { randGens[id*2] };*/
