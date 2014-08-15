@@ -306,9 +306,14 @@ void RDirichletDisc(float * a, int k, float * b,RndDiscState *randState)
 {
     int i;
     float sum=0.0;
+    float c,y,t;
+    c = 0.0;
     for(i=0; i<k; i++) {
         b[i]=RGammaDisc(a[i],1,randState);
-        sum += b[i];
+        y = b[i] - c;
+        t = sum + y;
+        c = (t - sum) -y;
+        sum = t;
     }
     for(i=0; i<k; i++) {
         b[i] /= sum;
@@ -351,9 +356,14 @@ void LogRDirichletDisc (float *a, int k,__global float *b,
     int i;
     float sum = 0.0;
     /* float sum2; */
+    float c,y,t;
+    c = 0.0;
     for (i = 0; i < k; i++) {
         b[i] =RGammaDisc (a[i], 1,randState);
-        sum += b[i];
+        y = b[i] - c;
+        t = sum + y;
+        c = (t - sum) -y;
+        sum = t;
     }
 
     /* patch added May 2007 to set gene frequencies equal if all draws

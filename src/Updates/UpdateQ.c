@@ -124,6 +124,7 @@ void UpdateQMetroCL (CLDict *clDict,int *Geno, int *PreGeno, float *Q, float *P,
 
     /* ======== Sample ====== */
     global[0] = NUMINDS;
+    /* global[0] = 1; */
     runKernel(clDict,RDirichletSampleKernel,1,global,"Dirichlet");
 
     /*readBuffer(clDict,TestQ,sizeof(float) *QSIZE,TESTQCL,"TestQ");*/
@@ -137,7 +138,8 @@ void UpdateQMetroCL (CLDict *clDict,int *Geno, int *PreGeno, float *Q, float *P,
     /* ======== Calculate likelihood ====== */
     global[0] = NUMLOCI;
     global[1] = NUMINDS;
-
+    /* global[0] = 1; */
+    /* global[1] = 1; */
     runKernel(clDict,mapReduceLogDiffsKernel,2,global,"reduceLogDiffs");
 
     /*
@@ -163,7 +165,9 @@ void UpdateQMetroCL (CLDict *clDict,int *Geno, int *PreGeno, float *Q, float *P,
     /*CalcLogdiffsCL(clDict,Geno,TestQ,Q,P,logdiffs);*/
 
     /* ========= Acceptance test ========= */
+
     global[0] = NUMINDS;
+    /* global[0] = 1; */
     runKernel(clDict,MetroAcceptTestKernel,1,global,"MetroAcceptTest");
 
 
@@ -452,8 +456,11 @@ void UpdateQAdmixtureCL (CLDict *clDict,float *Q, int *Z, float *Alpha,
     }*/
     /* Clear the buffer */
     /*writeBuffer(clDict,NumLociPops,sizeof(int)* NUMINDS*MAXPOPS, NUMLOCIPOPSCL,"NumLociPops");*/
+
     global[0] = NUMINDS;
     global[1] = NUMLOCI;
+    /* global[0] = 1; */
+    /* global[1] = 1; */
 
     runKernel(clDict,GetNumLociPopsKernel,2,global,"getNumLociPops");
     /*readBuffer(clDict,NumLociPops,sizeof(int)* NUMINDS*MAXPOPS, NUMLOCIPOPSCL,"NumLociPops");*/

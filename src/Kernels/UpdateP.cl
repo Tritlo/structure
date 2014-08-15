@@ -8,8 +8,8 @@ __kernel void GetNumFromPops (
 )
 {
     int loc = get_global_id(1);
-    int offset = loc*MAXPOPS*MAXALLELES;
     while (loc < NUMLOCI){
+        int offset = loc*MAXPOPS*MAXALLELES;
         int ind = get_global_id(0);
         int numalleles = NumAlleles[loc];
         int pos,line,popvalue,allelevalue;
@@ -55,16 +55,16 @@ __kernel void UpdateP (
 )
 {
     int loc = get_global_id(0);
-    int numalleles = NumAlleles[loc];
     float Parameters[MAXALLELES];
     RndDiscState randState[1];
     float param;
     int allele;
 
     while (loc < NUMLOCI){
+        int numalleles = NumAlleles[loc];
+        int offset = loc*MAXPOPS*MAXALLELES;
         int pop = get_global_id(1);
         while (pop < MAXPOPS) {
-            int offset = loc*MAXPOPS*MAXALLELES;
             int pos,line,popvalue,allelevalue;
             initRndDiscState(randState,randGens,loc*MAXPOPS +pop);
 

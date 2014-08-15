@@ -116,63 +116,66 @@ __kernel void mapReduceLogDiffs(__global float *Q,
                                 __global float *results,
                                 __local  float *scratch)
 {
-    int loc = get_global_id(0);
     int ind = get_global_id(1);
-    int numgroups = get_num_groups(0);
-    /* idempotent */
-    float logdiff = 0.0;
-    float c,y,t;
-    /* Map and partial reduce */
-    c = 0.0;
-    while( loc < NUMLOCI){
-        float elem = mapLogDiffsFunc(Q,TestQ,P,Geno,ind,loc);
-        y = elem -c;
-        t = logdiff+y;
-        c = (t - logdiff) - y;
-        logdiff = t;
-        loc += get_global_size(0);
-    }
-
-    /* reduce locally */
-    int localLoc = get_local_id(0);
-    scratch[localLoc] = logdiff;
-    barrier(CLK_LOCAL_MEM_FENCE);
-    int devs = get_local_size(0);
-    c = 0.0;
-    for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
-
-        if(localLoc < offset){
-            y = scratch[localLoc + offset] - c;
-            t = scratch[localLoc] + y;
-            c = (t-scratch[localLoc]) - y;
-            scratch[localLoc] = t;
-        }
-        //Handle if were not working on a multiple of 2
-        if (localLoc == 0 && (devs-1)/2 == offset){
-            y = scratch[devs-1] - c;
-            t = scratch[localLoc] + y;
-            c = (t-scratch[localLoc]) - y;
-            scratch[localLoc] = t;
+    while (ind < NUMINDS){
+        int numgroups = get_num_groups(0);
+        int loc = get_global_id(0);
+        /* idempotent */
+        float logdiff = 0.0;
+        float c,y,t;
+        /* Map and partial reduce */
+        c = 0.0;
+        while( loc < NUMLOCI){
+            float elem = mapLogDiffsFunc(Q,TestQ,P,Geno,ind,loc);
+            y = elem -c;
+            t = logdiff+y;
+            c = (t - logdiff) - y;
+            logdiff = t;
+            loc += get_global_size(0);
         }
 
-        devs >>= 1;
+        /* reduce locally */
+        int localLoc = get_local_id(0);
+        scratch[localLoc] = logdiff;
         barrier(CLK_LOCAL_MEM_FENCE);
-    }
+        int devs = get_local_size(0);
+        c = 0.0;
+        for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
 
-    /* save result */
-    int gid = get_group_id(0);
-    if(localLoc == 0){
-        results[ind*numgroups +gid] = scratch[0];
-    }
+            if(localLoc < offset){
+                y = scratch[localLoc + offset] - c;
+                t = scratch[localLoc] + y;
+                c = (t-scratch[localLoc]) - y;
+                scratch[localLoc] = t;
+            }
+            //Handle if were not working on a multiple of 2
+            if (localLoc == 0 && (devs-1)/2 == offset){
+                y = scratch[devs-1] - c;
+                t = scratch[localLoc] + y;
+                c = (t-scratch[localLoc]) - y;
+                scratch[localLoc] = t;
+            }
 
-    /* reduce over the groups into final result */
-    barrier(CLK_GLOBAL_MEM_FENCE);
-    if(gid==0){
-        logdiffs[ind] = 0;
-        for(int id =0; id < numgroups; id ++){
-            logdiffs[ind] += results[ind*numgroups + id];
-            results[ind*numgroups + id] = 0;
+            devs >>= 1;
+            barrier(CLK_LOCAL_MEM_FENCE);
         }
+
+        /* save result */
+        int gid = get_group_id(0);
+        if(localLoc == 0){
+            results[ind*numgroups +gid] = scratch[0];
+        }
+
+        /* reduce over the groups into final result */
+        barrier(CLK_GLOBAL_MEM_FENCE);
+        if(gid==0){
+            logdiffs[ind] = 0;
+            for(int id =0; id < numgroups; id ++){
+                logdiffs[ind] += results[ind*numgroups + id];
+                results[ind*numgroups + id] = 0;
+            }
+        }
+        ind += get_global_size(1);
     }
 }
 
@@ -234,66 +237,69 @@ __kernel void mapReduceLogLike(__global float *Q,
                                 __local  float *scratch)
 {
     int ind = get_global_id(1);
-    int loc = get_global_id(0);
-    int numgroups = get_num_groups(0);
-    /* idempotent */
-    float logterm = 0.0;
-    float c,y,t;
-    /* Map and partial reduce */
-    /* clear results buffer */
+    while (ind < NUMINDS){
+        int loc = get_global_id(0);
+        int numgroups = get_num_groups(0);
+        /* idempotent */
+        float logterm = 0.0;
+        float c,y,t;
+        /* Map and partial reduce */
+        /* clear results buffer */
 
-    if (ind < NUMINDS && loc < NUMLOCI){
-        c = 0.0;
-        while( loc < NUMLOCI){
-            float elem = mapLogLikeFunc(Q,P,Geno,ind,loc);
-            y = elem - c;
-            t = logterm + y;
-            c = (t - logterm) - y;
-            logterm = t;
-            loc += get_global_size(0);
-        }
-
-        /* reduce locally */
-        int localLoc = get_local_id(0);
-        scratch[localLoc] = logterm;
-        barrier(CLK_LOCAL_MEM_FENCE);
-        int devs = get_local_size(0);
-        c = 0.0;
-        for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
-            if(localLoc < offset){
-                y = scratch[localLoc + offset] - c;
-                t = scratch[localLoc] + y;
-                c = (t-scratch[localLoc]) - y;
-                scratch[localLoc] = t;
-            }
-            //Handle if were not working on a multiple of 2
-            if (localLoc == 0 && (devs-1)/2 == offset){
-                y = scratch[devs-1] - c;
-                t = scratch[localLoc] + y;
-                c = (t-scratch[localLoc]) - y;
-                scratch[localLoc] = t;
+        if (ind < NUMINDS && loc < NUMLOCI){
+            c = 0.0;
+            while( loc < NUMLOCI){
+                float elem = mapLogLikeFunc(Q,P,Geno,ind,loc);
+                y = elem - c;
+                t = logterm + y;
+                c = (t - logterm) - y;
+                logterm = t;
+                loc += get_global_size(0);
             }
 
-            devs >>= 1;
+            /* reduce locally */
+            int localLoc = get_local_id(0);
+            scratch[localLoc] = logterm;
             barrier(CLK_LOCAL_MEM_FENCE);
-        }
+            int devs = get_local_size(0);
+            c = 0.0;
+            for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
+                if(localLoc < offset){
+                    y = scratch[localLoc + offset] - c;
+                    t = scratch[localLoc] + y;
+                    c = (t-scratch[localLoc]) - y;
+                    scratch[localLoc] = t;
+                }
+                //Handle if were not working on a multiple of 2
+                if (localLoc == 0 && (devs-1)/2 == offset){
+                    y = scratch[devs-1] - c;
+                    t = scratch[localLoc] + y;
+                    c = (t-scratch[localLoc]) - y;
+                    scratch[localLoc] = t;
+                }
 
-        /* save result */
-        int gid = get_group_id(0);
-        if(localLoc == 0){
-            /*results[ind*numgroups +gid] = 1;*/
-            results[ind*numgroups +gid] = scratch[0];
-        }
+                devs >>= 1;
+                barrier(CLK_LOCAL_MEM_FENCE);
+            }
 
-        /* reduce over the groups into final result */
-        barrier(CLK_GLOBAL_MEM_FENCE);
-        if(gid==0){
-            loglikes[ind] = 0;
-            for(int id =0; id < numgroups; id ++){
-                loglikes[ind] += results[ind*numgroups + id];
-                results[ind*numgroups + id] = 0;
+            /* save result */
+            int gid = get_group_id(0);
+            if(localLoc == 0){
+                /*results[ind*numgroups +gid] = 1;*/
+                results[ind*numgroups +gid] = scratch[0];
+            }
+
+            /* reduce over the groups into final result */
+            barrier(CLK_GLOBAL_MEM_FENCE);
+            if(gid==0){
+                loglikes[ind] = 0;
+                for(int id =0; id < numgroups; id ++){
+                    loglikes[ind] += results[ind*numgroups + id];
+                    results[ind*numgroups + id] = 0;
+                }
             }
         }
+        ind += get_global_size(1);
     }
 }
 

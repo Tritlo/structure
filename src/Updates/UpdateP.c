@@ -217,6 +217,8 @@ void UpdatePCL (CLDict *clDict,float *P,  float *Epsilon,
     error[1] = 0;
     global[0] = NUMINDS;
     global[1] = NUMLOCI;
+    /* global[0] = 1; */
+    /* global[1] = 1; */
 
     /*
      * GetNumFromPops writes
@@ -253,6 +255,8 @@ void UpdatePCL (CLDict *clDict,float *P,  float *Epsilon,
 
     global[0] = NUMLOCI;
     global[1] = MAXPOPS;
+    /* global[0] = 1; */
+    /* global[1] = 1; */
 
     runKernel(clDict,UpdatePKernel,2,global,"UpdateP");
 

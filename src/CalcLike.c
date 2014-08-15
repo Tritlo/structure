@@ -207,6 +207,8 @@ void CalcLogdiffsCL(CLDict *clDict,int *Geno,float *TestQ, float *Q, float *P, f
     size_t global[2];
     global[0] = NUMLOCI;
     global[1] = NUMINDS;
+    /* global[0] = 1; */
+    /* global[1] = 1; */
 
     /*logterms = calloc(NUMINDS*NUMLOCI,sizeof(float));*/
     /*lgtcl = calloc(NUMINDS*NUMLOCI,sizeof(float));

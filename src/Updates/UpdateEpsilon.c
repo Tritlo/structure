@@ -179,6 +179,7 @@ void NonIndependenceUpdateEpsilonCL(CLDict *clDict,float *P, float *Epsilon,
     /*this sets the range from which the proposal is drawn*/
 
     global[0] = NUMLOCI;
+    /* global[0] = 1; */
     runKernel(clDict,NonIndUpdateEpsilonKernel,1,global,"Non Ind UpdateEpsilon kernel");
 
     /*gpueps = calloc(MAXALLELES*NUMLOCI,sizeof(float));
