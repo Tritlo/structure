@@ -65,7 +65,7 @@ __kernel void UpdateP (
         int offset = loc*MAXPOPS*MAXALLELES;
         int pop = get_global_id(1);
         while (pop < MAXPOPS) {
-            int pos,line,popvalue,allelevalue;
+            /* int pos,line,popvalue,allelevalue; */
             initRndDiscState(randState,randGens,loc*MAXPOPS +pop);
 
             for (allele = 0; allele < numalleles; allele++) {
@@ -73,7 +73,7 @@ __kernel void UpdateP (
                                      allele)+offset];
                 #if FREQSCORR
                     param = Epsilon[EpsPos (loc, allele)]
-                                     *(1.0- Fst[pop])/Fst[pop];
+                                     *(1.0f- Fst[pop])/Fst[pop];
                 #else
                     param = lambda[pop];
                 #endif

@@ -39,7 +39,7 @@ __kernel void FillArrayWRandom(
     uint i;
     float val;
     ulong samplesPerstream = length/get_global_size(0);
-    uint offset = pos*samplesPerstream;
+    int offset = pos*samplesPerstream;
     if (offset < length){
         for(i = 0; i < samplesPerstream && i+offset < length; i++){
             randomArr[offset+i] = uintToUnit(MWC64X_NextUint(&rng));

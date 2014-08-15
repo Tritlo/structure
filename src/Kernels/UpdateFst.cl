@@ -75,7 +75,7 @@ __kernel void UpdateFst(
         int loc = get_global_id(0);
         float newf = normals[pop];
         /* ensure newf is large enough so we don't cause over/underflow */
-        if (newf > 10e-5 && newf < 1.0f){
+        if (newf > 10e-5f && newf < 1.0f){
             float sum = 0.0f;
             int redpop;
             int numredpops;

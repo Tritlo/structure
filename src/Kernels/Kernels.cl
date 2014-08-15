@@ -11,8 +11,8 @@
 #define EpsPos(loc,allele) ((loc)*(MAXALLELES)+(allele))    /* Epsilon */
 #define AncestDistPos(ind,pop,box) ((ind)*(MAXPOPS)*(NUMBOXES)+(pop)*(NUMBOXES)+(box))
 
-#define UNDERFLO 10e-40
-#define SQUNDERFLO 10e-20
+#define UNDERFLO 10e-40f
+#define SQUNDERFLO 10e-20f
 
 #include "Kernels/util.cl"
 #include "Kernels/KernelErrors.h"

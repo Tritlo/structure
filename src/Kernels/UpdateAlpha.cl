@@ -18,7 +18,7 @@ __kernel void UpdateAlpha(
        const int POPFLAGINDS)
 {
     int alpha = get_global_id(1);
-    float c, y, t, input; // KahanSum
+    float c, y, t; // KahanSum
     while( alpha < NUMALPHAS){
         int ind = get_global_id(0);
         if(ind < NUMINDS){
