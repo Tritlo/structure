@@ -84,6 +84,8 @@ typedef struct CLDict {
     cl_context context;
     cl_device_id device_id;
     cl_command_queue commands;
+    cl_event *event_wait_list;
+    cl_uint num_events_in_waitlist;
 } CLDict;
 
 #endif

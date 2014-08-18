@@ -494,32 +494,33 @@ int main (int argc, char *argv[])
     /*Initialize Q */
     initQ(Q);
     initRandGens(clDict);
+    finishWaitList(clDict);
     for (rep = 0; rep < (NUMREPS + BURNIN); rep++) {
 
         /*FillArrayWithRandomCL(clDict,randomArr,NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM);*/
         /*FillArrayWithRandom(randomArr,NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM);*/
         /*FillArrayWithRandom(randomArr,RANDSIZE);*/
 
-        if(DEBUGCOMPARE) {
-            readBuffer(clDict,randomArr,
-                    sizeof(float) * NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM,RANDCL,
-                    "randomArr");
-            comparePCLandP(clDict,P,Epsilon, Fst, NumAlleles, Geno, Z,
-                           lambda, Individual, randomArr);
-        }
-        if (USEWORKINGCL) {
+        /* if(DEBUGCOMPARE) { */
+        /*     readBuffer(clDict,randomArr, */
+        /*             sizeof(float) * NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM,RANDCL, */
+        /*             "randomArr"); */
+        /*     comparePCLandP(clDict,P,Epsilon, Fst, NumAlleles, Geno, Z, */
+        /*                    lambda, Individual, randomArr); */
+        /* } */
+        /* if (USEWORKINGCL) { */
             /* clear buffer */
             writeBuffer(clDict,Numafrompopscl,sizeof(int) * NUMLOCI*MAXPOPS*MAXALLELES,NUMAFROMPOPSCL,"NumAFromPops");
             UpdatePCL (clDict,P, Epsilon, Fst, NumAlleles, Geno, Z, lambda,
                        Individual,
                        randomArr);
-        }  else {
-            readBuffer(clDict,randomArr,
-                    sizeof(float) * NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM,RANDCL,
-                    "randomArr");
-            UpdateP (P, Epsilon, Fst, NumAlleles, Geno, Z, lambda, Individual,
-                     randomArr);
-        }
+        /* }  else { */
+        /*     readBuffer(clDict,randomArr, */
+        /*             sizeof(float) * NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM,RANDCL, */
+        /*             "randomArr"); */
+        /*     UpdateP (P, Epsilon, Fst, NumAlleles, Geno, Z, lambda, Individual, */
+        /*              randomArr); */
+        /* } */
 
         /* Update Q */
         /*FillArrayWithRandomCL(clDict,randomArr,NUMINDS+NUMINDS*MAXRANDOM);*/
@@ -554,22 +555,22 @@ int main (int argc, char *argv[])
             }
         } else {
             /*FillArrayWithRandomCL(clDict,randomArr,NUMINDS*NUMLOCI*LINES);*/
-            if (DEBUGCOMPARE) {
-                readBuffer(clDict,randomArr,
-                        sizeof(float) * NUMINDS*NUMLOCI*LINES,RANDCL,
-                        "randomArr");
-                compareZCLandZ(clDict,Z,Q,P,Geno,randomArr);
-            }
-            if (USEWORKINGCL) {
+            /* if (DEBUGCOMPARE) { */
+            /*     readBuffer(clDict,randomArr, */
+            /*             sizeof(float) * NUMINDS*NUMLOCI*LINES,RANDCL, */
+            /*             "randomArr"); */
+            /*     compareZCLandZ(clDict,Z,Q,P,Geno,randomArr); */
+            /* } */
+            /* if (USEWORKINGCL) { */
                 UpdateZCL (clDict,Z,  Q, P, Geno,randomArr);
                 /* Not needed */
                 /*readBuffer(clDict,Z,sizeof(int)*ZSIZE,ZCL,"Z");*/
-            } else {
-                readBuffer(clDict,randomArr,
-                        sizeof(float) * NUMINDS*NUMLOCI*LINES,RANDCL,
-                        "randomArr");
-                UpdateZ (Z,  Q, P, Geno,randomArr);
-            }
+            /* } else { */
+            /*     readBuffer(clDict,randomArr, */
+            /*             sizeof(float) * NUMINDS*NUMLOCI*LINES,RANDCL, */
+            /*             "randomArr"); */
+            /*     UpdateZ (Z,  Q, P, Geno,randomArr); */
+            /* } */
             /*      printf("done updatez alpha[2]=%e\n", Alpha[2]); */
         }
 
@@ -682,6 +683,7 @@ int main (int argc, char *argv[])
                          *sumlikes, *sumsqlikes, NumAlleles, R, lambda,Individual,
                          recomblikelihood, Recessive, LocPrior, LocPriorLen);
         }
+        finishWaitList(clDict);
     }
 
     /*====final book-keeping====================================*/

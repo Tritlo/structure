@@ -189,6 +189,7 @@ void ReleaseCLDict(CLDict *clDict)
     }
     free(clDict->buffers);
     free(clDict->locals);
+    free(clDict->event_wait_list);
     clReleaseCommandQueue(clDict->commands);
     clReleaseContext(clDict->context);
     free(clDict);
@@ -652,6 +653,7 @@ int InitCLDict(CLDict *clDictToInit)
     cl_context context;
     cl_device_id device_id;
     cl_command_queue commands;
+    cl_event *event_wait_list;
     int err;
     int compileret;
     char options[1024];
@@ -701,6 +703,7 @@ int InitCLDict(CLDict *clDictToInit)
     kernels = calloc(NumberOfKernels, sizeof(cl_kernel));
     buffers = calloc(NumberOfBuffers, sizeof(cl_mem));
     locals = calloc(NumberOfKernels, sizeof(size_t));
+    event_wait_list = calloc(255,sizeof(cl_event));
     clDictToInit->kernels = kernels;
     clDictToInit->buffers = buffers;
     clDictToInit->locals = locals;
@@ -710,6 +713,8 @@ int InitCLDict(CLDict *clDictToInit)
     clDictToInit->device_id = device_id;
     clDictToInit->context = context;
     clDictToInit->commands = commands;
+    clDictToInit->event_wait_list = event_wait_list;
+    clDictToInit->num_events_in_waitlist = 0;
 
     /* compile OpenCL kernels */
     /*Define the constants in the kernels */
@@ -793,8 +798,16 @@ void finishCommands(CLDict *clDict, char * name)
     handleCLErr(err, clDict,fmsg);
 }
 
+void addToWaitList(CLDict *clDict,cl_event event){
+    clDict->event_wait_list[(clDict->num_events_in_waitlist)++] = event;
+}
+void finishWaitList(CLDict *clDict){
+    finishCommands(clDict,"finishing command list");
+    clDict->num_events_in_waitlist=0;
+}
+
 /*
- * Reads the buffer fource from the gpu to the array dest
+ * Reads the buffer source from the GPU to the array dest
  */
 void readBuffer(CLDict *clDict, void * dest, size_t size, enum BUFFER source,
                 char *name)
@@ -806,9 +819,11 @@ void readBuffer(CLDict *clDict, void * dest, size_t size, enum BUFFER source,
     /*strcat(msg,name);*/
     /*strcat(msg,"!\n");*/
     /*finishCommands(clDict,msg);*/
+    cl_event event;
     err = clEnqueueReadBuffer(clDict->commands, clDict->buffers[source], CL_TRUE,
                               0,
-                              size, dest, 0, NULL, NULL );
+                              size, dest, clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+    addToWaitList(clDict,event);
     strcpy(msg,"Failed to read buffer: ");
     strcat(msg,name);
     strcat(msg,"!\n");
@@ -828,10 +843,12 @@ void readBuffers(CLDict *clDict, void * dest[], size_t size[], enum BUFFER sourc
     /*strcat(msg,name);*/
     /*strcat(msg,"!\n");*/
     /*finishCommands(clDict,msg);*/
+    cl_event event;
     for(buff =0; buff < numbufferstoread; buff++){
         err = clEnqueueReadBuffer(clDict->commands, clDict->buffers[source[buff]], CL_FALSE,
                                   0,
-                                  size[buff], dest[buff], 0, NULL, NULL );
+                                  size[buff], dest[buff], clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+        addToWaitList(clDict,event);
         strcpy(msg,"Failed to read buffer: ");
         strcat(msg,name[buff]);
         strcat(msg,"!\n");
@@ -856,11 +873,12 @@ void writeBuffer(CLDict *clDict, void * source, size_t size,
     /*strcat(msg,name);*/
     /*strcat(msg,"!\n");*/
     /*finishCommands(clDict,msg);*/
-
+    cl_event event;
     err = clEnqueueWriteBuffer(clDict->commands, clDict->buffers[dest], CL_FALSE,
                                0,
-                               size, source, 0, NULL, NULL );
-
+                               size,source,
+                               clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+    addToWaitList(clDict,event);
     strcpy(msg,"Failed to write buffer: ");
     strcat(msg,name);
     strcat(msg,"!\n");
@@ -870,13 +888,17 @@ void writeBuffer(CLDict *clDict, void * source, size_t size,
 }
 
 
+
 void runKernel(CLDict *clDict, enum KERNEL kernel, int numdims, size_t *dims,
                char *name)
 {
     cl_int err;
     char msg[120];
+    cl_event event;
     err = clEnqueueNDRangeKernel(clDict->commands, clDict->kernels[kernel],
-                                 numdims, NULL, dims, NULL, 0, NULL, NULL);
+                                 numdims, NULL, dims, NULL,
+                               clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+    addToWaitList(clDict,event);
     strcpy(msg,"Failed to run kernel: ");
     strcat(msg,name);
     strcat(msg,"!\n");
@@ -889,7 +911,10 @@ void runTask(CLDict *clDict, enum KERNEL kernel, char *name)
 {
     cl_int err;
     char msg[120];
-    err = clEnqueueTask(clDict->commands, clDict->kernels[kernel],0, NULL,NULL) ;
+    cl_event event;
+    err = clEnqueueTask(clDict->commands, clDict->kernels[kernel],
+                               clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+    addToWaitList(clDict,event);
     strcpy(msg,"Failed to run task: ");
     strcat(msg,name);
     strcat(msg,"!\n");
