@@ -568,72 +568,122 @@ int CompileKernels(CLDict *clDict,  char *options)
     return EXIT_SUCCESS;
 }
 
-void createCLBuffer(CLDict *clDict, enum BUFFER buffer, size_t size, cl_mem_flags type){
+void finishCommands(CLDict *clDict, char * name)
+{
     cl_int err;
+    char fmsg[120];
+    err = clFinish(clDict->commands);
+    strcpy(fmsg,"clFinish error: ");
+    strcat(fmsg,name);
+    strcat(fmsg,"!\n");
+    handleCLErr(err, clDict,fmsg);
+}
+
+void addToWaitList(CLDict *clDict,cl_event event){
+    /* clDict->event_wait_list[(clDict->num_events_in_waitlist)++] = event; */
+}
+void finishWaitList(CLDict *clDict){
+    finishCommands(clDict,"finishing command list");
+    clDict->num_events_in_waitlist=0;
+}
+
+void writeBuffer(CLDict *clDict, void * source, size_t size,
+                 enum BUFFER dest, char *name)
+{
+    cl_int err;
+    char msg[120];
+
+    /* apparently a blocking enqueue already does this */
+    /*strcpy(msg,"Prewrite finish error: ");*/
+    /*strcat(msg,name);*/
+    /*strcat(msg,"!\n");*/
+    /*finishCommands(clDict,msg);*/
+    cl_event event;
+    err = clEnqueueWriteBuffer(clDict->commands, clDict->buffers[dest], CL_FALSE,
+                               0,
+                               size,source,
+                               clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+    addToWaitList(clDict,event);
+    strcpy(msg,"Failed to write buffer: ");
+    strcat(msg,name);
+    strcat(msg,"!\n");
+    handleCLErr(err, clDict,msg);
+    /*err = clFinish(clDict->commands);*/
+    /*handleCLErr(err, clDict,"clFinish error!\n");*/
+}
+
+void createCLBuffer(CLDict *clDict, enum BUFFER buffer, size_t size,int length, cl_mem_flags type){
+    cl_int err;
+    void * emptybuffer;
     clDict->buffers[buffer] = clCreateBuffer(clDict->context,  type,
-                                          size,NULL, &err);
+
+                                          size*length,NULL, &err);
+    
     handleCLErr(err, clDict,"Error: Failed create buffer!");
+    emptybuffer = calloc(length,size);
+    writeBuffer(clDict,emptybuffer,size*length,buffer,"empty buffer");
+    free(emptybuffer);
 }
 
 void createCLBuffers(CLDict *clDict)
 {
-    createCLBuffer(clDict,QCL,sizeof(float)*QSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,QSUMCL,sizeof(float)*QSIZE,CL_MEM_WRITE_ONLY);
-    createCLBuffer(clDict,PCL,sizeof(float)*PSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,PSUMCL,sizeof(float)*PSIZE,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,QCL,sizeof(float),QSIZE,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,QSUMCL,sizeof(float),QSIZE,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,PCL,sizeof(float),PSIZE,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,PSUMCL,sizeof(float),PSIZE,CL_MEM_WRITE_ONLY);
 
     if (FREQSCORR) {
-        createCLBuffer(clDict,FSTCL,sizeof(float)*MAXPOPS,CL_MEM_READ_WRITE);
-        createCLBuffer(clDict,FSTSUMCL,sizeof(float)*MAXPOPS,CL_MEM_WRITE_ONLY);
-        createCLBuffer(clDict,NORMSCL,sizeof(float)*MAXPOPS,CL_MEM_READ_WRITE);
-        createCLBuffer(clDict,EPSILONCL,sizeof(float)*NUMLOCI*MAXALLELES,CL_MEM_READ_WRITE);
-        createCLBuffer(clDict,EPSILONSUMCL,sizeof(float)*NUMLOCI*MAXALLELES,CL_MEM_WRITE_ONLY);
+        createCLBuffer(clDict,FSTCL,sizeof(float),MAXPOPS,CL_MEM_READ_WRITE);
+        createCLBuffer(clDict,FSTSUMCL,sizeof(float),MAXPOPS,CL_MEM_WRITE_ONLY);
+        createCLBuffer(clDict,NORMSCL,sizeof(float),MAXPOPS,CL_MEM_READ_WRITE);
+        createCLBuffer(clDict,EPSILONCL,sizeof(float),NUMLOCI*MAXALLELES,CL_MEM_READ_WRITE);
+        createCLBuffer(clDict,EPSILONSUMCL,sizeof(float),NUMLOCI*MAXALLELES,CL_MEM_WRITE_ONLY);
     }
 
-    createCLBuffer(clDict,LAMBDACL,sizeof(float)*MAXPOPS,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,LAMBDASUMCL,sizeof(float)*MAXPOPS,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,LAMBDACL,sizeof(float),MAXPOPS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,LAMBDASUMCL,sizeof(float),MAXPOPS,CL_MEM_WRITE_ONLY);
 
-    createCLBuffer(clDict,ZCL,sizeof(int)*ZSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,GENOCL,sizeof(int)*GENOSIZE,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,ZCL,sizeof(int),ZSIZE,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,GENOCL,sizeof(int),GENOSIZE,CL_MEM_READ_WRITE);
 
 
     if (RECESSIVEALLELES) {
-        createCLBuffer(clDict,PREGENOCL,sizeof(int)*GENOSIZE,CL_MEM_READ_WRITE);
-        createCLBuffer(clDict,RECESSIVECL,sizeof(int)*NUMLOCI,CL_MEM_READ_WRITE);
+        createCLBuffer(clDict,PREGENOCL,sizeof(int),GENOSIZE,CL_MEM_READ_WRITE);
+        createCLBuffer(clDict,RECESSIVECL,sizeof(int),NUMLOCI,CL_MEM_READ_WRITE);
 
     }
-    createCLBuffer(clDict,NUMALLELESCL,sizeof(int)*NUMLOCI,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,NUMALLELESCL,sizeof(int),NUMLOCI,CL_MEM_READ_WRITE);
 
     /*if (PFROMPOPFLAGONLY || USEPOPINFO) {*/
     /*}*/
-    createCLBuffer(clDict,POPFLAGCL,sizeof(int)*NUMINDS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,POPFLAGCL,sizeof(int),NUMINDS,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,NUMAFROMPOPSCL,sizeof(int)*NUMLOCI*MAXPOPS*MAXALLELES,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,NUMAFROMPOPSCL,sizeof(int),NUMLOCI*MAXPOPS*MAXALLELES,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,NUMLOCIPOPSCL,sizeof(int)*NUMINDS*MAXPOPS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,NUMLOCIPOPSCL,sizeof(int),NUMINDS*MAXPOPS,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,LOGDIFFSCL,sizeof(float)*NUMINDS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,LOGDIFFSCL,sizeof(float),NUMINDS,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,REDUCERESULTSCL,sizeof(float)*MAXGROUPS*NUMINDS*NUMLOCI,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,REDUCERESULTSCL,sizeof(float),MAXGROUPS*NUMINDS*NUMLOCI,CL_MEM_READ_WRITE);
 
     /*createCLBuffer(clDict,LOGTERMSCL,sizeof(float)*NUMINDS*NUMLOCI,CL_MEM_READ_WRITE);*/
-    createCLBuffer(clDict,ALPHACL,sizeof(float)*MAXPOPS,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,ALPHASUMCL,sizeof(float)*MAXPOPS,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,ALPHACL,sizeof(float),MAXPOPS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,ALPHASUMCL,sizeof(float),MAXPOPS,CL_MEM_WRITE_ONLY);
 
-    createCLBuffer(clDict,TESTQCL,sizeof(float)*QSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,RANDCL,sizeof(float)*RANDSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,RANDGENSCL,sizeof(unsigned int)*NUMRANDGENS*2,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,ERRORCL,sizeof(int)*2,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,TESTQCL,sizeof(float),QSIZE,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,RANDCL,sizeof(float),RANDSIZE,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,RANDGENSCL,sizeof(unsigned int),NUMRANDGENS*2,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,ERRORCL,sizeof(int),2,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,LOGLIKESCL,sizeof(float)*NUMINDS,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,INDLIKECL,sizeof(float)*NUMINDS,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,SUMINDLIKECL,sizeof(float)*NUMINDS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,LOGLIKESCL,sizeof(float),NUMINDS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,INDLIKECL,sizeof(float),NUMINDS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,SUMINDLIKECL,sizeof(float),NUMINDS,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,LIKECL,sizeof(float),CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,SUMLIKESCL,sizeof(float),CL_MEM_WRITE_ONLY);
-    createCLBuffer(clDict,SUMSQLIKESCL,sizeof(float),CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,LIKECL,sizeof(float),1,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,SUMLIKESCL,sizeof(float),1,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,SUMSQLIKESCL,sizeof(float),1,CL_MEM_WRITE_ONLY);
 
-    createCLBuffer(clDict,ANCESTDISTCL,sizeof(int)*NUMINDS*MAXPOPS*NUMBOXES,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,ANCESTDISTCL,sizeof(int),NUMINDS*MAXPOPS*NUMBOXES,CL_MEM_WRITE_ONLY);
 }
 
 
@@ -801,24 +851,6 @@ void copyToLocal( float * globalArr, float *localArr,
     dims[numDims-1] = origLastDim;
 }
 
-void finishCommands(CLDict *clDict, char * name)
-{
-    cl_int err;
-    char fmsg[120];
-    err = clFinish(clDict->commands);
-    strcpy(fmsg,"clFinish error: ");
-    strcat(fmsg,name);
-    strcat(fmsg,"!\n");
-    handleCLErr(err, clDict,fmsg);
-}
-
-void addToWaitList(CLDict *clDict,cl_event event){
-    /* clDict->event_wait_list[(clDict->num_events_in_waitlist)++] = event; */
-}
-void finishWaitList(CLDict *clDict){
-    finishCommands(clDict,"finishing command list");
-    clDict->num_events_in_waitlist=0;
-}
 
 /*
  * Reads the buffer source from the GPU to the array dest
@@ -876,30 +908,6 @@ void readBuffers(CLDict *clDict, void * dest[], size_t size[], enum BUFFER sourc
  * Writes the array source to the buffer dest on the GPU
  */
 
-void writeBuffer(CLDict *clDict, void * source, size_t size,
-                 enum BUFFER dest, char *name)
-{
-    cl_int err;
-    char msg[120];
-
-    /* apparently a blocking enqueue already does this */
-    /*strcpy(msg,"Prewrite finish error: ");*/
-    /*strcat(msg,name);*/
-    /*strcat(msg,"!\n");*/
-    /*finishCommands(clDict,msg);*/
-    cl_event event;
-    err = clEnqueueWriteBuffer(clDict->commands, clDict->buffers[dest], CL_FALSE,
-                               0,
-                               size,source,
-                               clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
-    addToWaitList(clDict,event);
-    strcpy(msg,"Failed to write buffer: ");
-    strcat(msg,name);
-    strcat(msg,"!\n");
-    handleCLErr(err, clDict,msg);
-    /*err = clFinish(clDict->commands);*/
-    /*handleCLErr(err, clDict,"clFinish error!\n");*/
-}
 
 
 
