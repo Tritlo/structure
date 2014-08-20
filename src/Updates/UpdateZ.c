@@ -66,10 +66,12 @@ void UpdateZCL (CLDict *clDict,int *Z,  float *Q, float *P, int *Geno,
     int error[1];
 
     error[0] = 0;
-    global[0] = NUMINDS;
-    global[1] = NUMLOCI;
-    /* global[0] = 1; */
-    /* global[1] = 1; */
+    global[0] = fmin(MAXDIM,NUMINDS);
+    global[1] = fmin(MAXDIM,NUMLOCI);
+    /* if (ONLYONEDIM){ */
+    /*     global[0] = 1; */
+    /*     global[1] = 1; */
+    /* } */
 
 
 

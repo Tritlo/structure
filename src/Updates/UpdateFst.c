@@ -127,11 +127,14 @@ UpdateFstCL (CLDict *clDict,float *Epsilon, float *Fst, float *P, int *NumAllele
     setKernelArgExplicit(clDict,PopNormals,sizeof(int),&numfst,4);
     runTask(clDict,PopNormals,"PopNormals Fst");
 
-    global[0] = pow(2,(int) (log(NUMLOCI)/log(2)));
+    /* global[0] = pow(2,(int) (log(NUMLOCI)/log(2))); */
     /* global[0] = (128 < NUMLOCI ) ? 128 : NUMLOCI; */
-    global[1] = numfst;
-    /* global[0] = 1; */
-    /* global[1] = 1; */
+    global[0] = fmin(MAXDIM,NUMLOCI);
+    global[1] = fmin(MAXDIM,numfst);
+    /* if (ONLYONEDIM){ */
+    /*     global[0] = 1; */
+    /*     global[1] = 1; */
+    /* } */
     runKernel(clDict,UpdateFstKernel,2,global,"UpdateFst");
     /*if (rep % 100 == 0){
         readBuffer(clDict,reduceresult,sizeof(float)*MAXGROUPS*NUMINDS*NUMLOCI,REDUCERESULTSCL,"result");

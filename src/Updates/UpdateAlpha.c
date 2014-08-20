@@ -343,10 +343,12 @@ void UpdateAlphaCL (CLDict *clDict,float *Q, float *Alpha, struct IND *Individua
 
         /* The smaller the group, the less danger of underflow is there */
         /* global[0] = pow(2,(int) (log(NUMINDS)/log(2))); */
-        /* global[0] = NUMINDS; */
-        /* global[1] = numalphas; */
-        global[0] = 1;
-        global[1] = 1;
+        global[0] = fmin(MAXDIM,NUMINDS);
+        global[1] = fmin(MAXDIM,numalphas);
+        /* if (ONLYONEDIM){ */
+        /*     global[0] = 1; */
+        /*     global[1] = 1; */
+        /* } */
         runKernel(clDict,UpdateAlphaKernel,2,global,"Update Alpha kernel");
         /*
         alphasum = 0.0;

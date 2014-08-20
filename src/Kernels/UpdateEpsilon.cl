@@ -1,17 +1,3 @@
-inline void AtomicAdd(volatile __global float *source, const float operand) {
-    union {
-        unsigned int intVal;
-        float floatVal;
-    } newVal;
-    union {
-        unsigned int intVal;
-        float floatVal;
-    } prevVal;
-    do {
-        prevVal.floatVal = *source;
-        newVal.floatVal = prevVal.floatVal + operand;
-    } while (atomic_cmpxchg((volatile __global unsigned int *)source, prevVal.intVal, newVal.intVal) != prevVal.intVal);
-}
 
 
 
@@ -38,6 +24,7 @@ __kernel void NonIndUpdateEpsilon(
 
     RndDiscState randState[1];
     initRndDiscState(randState,randGens,loc);
+    
     while (loc < NUMLOCI){
         int numalls = NumAlleles[loc];
         if (numalls > 1){

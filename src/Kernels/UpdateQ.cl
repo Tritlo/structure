@@ -49,7 +49,7 @@ __kernel void GetNumLociPops(
                     for (line = 0; line < LINES; line++) {
                         from = Z[ZPos (ind, line, loc)];
                         if (from != UNASSIGNED) {
-                            atom_inc(&NumLociPops[from+offset]);
+                            AtomicInc(&NumLociPops[from+offset]);
                         }
                     }
                 }

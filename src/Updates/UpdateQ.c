@@ -123,8 +123,9 @@ void UpdateQMetroCL (CLDict *clDict,int *Geno, int *PreGeno, float *Q, float *P,
     /*writeBuffer(clDict,randomArr,sizeof(float) * (NUMINDS*MAXRANDOM+NUMINDS),RANDCL,"Random");*/
 
     /* ======== Sample ====== */
-    global[0] = NUMINDS;
-    /* global[0] = 1; */
+    global[0] = fmin(MAXDIM,NUMINDS);
+    /* if (ONLYONEDIM) */
+    /*     global[0] = 1; */
     runKernel(clDict,RDirichletSampleKernel,1,global,"Dirichlet");
 
     /*readBuffer(clDict,TestQ,sizeof(float) *QSIZE,TESTQCL,"TestQ");*/
@@ -136,10 +137,12 @@ void UpdateQMetroCL (CLDict *clDict,int *Geno, int *PreGeno, float *Q, float *P,
 
 
     /* ======== Calculate likelihood ====== */
-    global[0] = NUMLOCI;
-    global[1] = NUMINDS;
-    /* global[0] = 1; */
-    /* global[1] = 1; */
+    global[0] = fmin(MAXDIM,NUMLOCI);
+    global[1] = fmin(MAXDIM,NUMINDS);
+    /* if (ONLYONEDIM){ */
+    /*     global[0] = 1; */
+    /*     global[1] = 1; */
+    /* } */
     runKernel(clDict,mapReduceLogDiffsKernel,2,global,"reduceLogDiffs");
 
     /*
@@ -166,8 +169,9 @@ void UpdateQMetroCL (CLDict *clDict,int *Geno, int *PreGeno, float *Q, float *P,
 
     /* ========= Acceptance test ========= */
 
-    global[0] = NUMINDS;
-    /* global[0] = 1; */
+    global[0] = fmin(MAXDIM,NUMINDS);
+    /* if (ONLYONEDIM) */
+    /*     global[0] = 1; */
     runKernel(clDict,MetroAcceptTestKernel,1,global,"MetroAcceptTest");
 
 

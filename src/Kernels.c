@@ -12,7 +12,6 @@
 #include "structure.h"
 
 #define MAX_SOURCE_SIZE (0x100000)
-#define USEGPU 1
 
 
 void printCLErr(cl_int err)
@@ -646,7 +645,7 @@ int InitCLDict(CLDict *clDictToInit)
     cl_kernel *kernels;
     cl_mem *buffers;
     size_t *locals;
-    cl_platform_id platform_id;
+    cl_platform_id *platform_id;
     cl_uint ret_num_devices;
     cl_uint ret_num_platforms;
     cl_int ret;
@@ -655,37 +654,51 @@ int InitCLDict(CLDict *clDictToInit)
     cl_command_queue commands;
     cl_event *event_wait_list;
     int err;
+    int i;
+    int foundDevice = 0;
     int compileret;
     char options[1024];
     int numalphas = POPALPHAS ? MAXPOPS : 1;
     int DEVICETYPE =  USEGPU ? CL_DEVICE_TYPE_GPU : CL_DEVICE_TYPE_CPU;
-
-    ret = clGetPlatformIDs(1, &platform_id, &ret_num_platforms);
-    err = clGetDeviceIDs(platform_id, DEVICETYPE, 1, &device_id, &ret_num_devices);
-    if (err != CL_SUCCESS) {
-        printf("retval %d\n",(int) ret);
-        switch(err) {
-        case CL_INVALID_PLATFORM:
-            printf("invalid platform!");
-            break;
-        case CL_INVALID_VALUE:
-            printf("invalid value");
-            break;
-        case CL_DEVICE_NOT_FOUND:
-            printf("device not found");
-            break;
-        case CL_INVALID_DEVICE_TYPE:
-            if(USEGPU) {
-                printf("invalid device: GPU\n");
-            } else {
-                printf("invalid device: CPU\n");
+    ret = clGetPlatformIDs(0, NULL, &ret_num_platforms);
+    platform_id = calloc(ret_num_platforms,sizeof(cl_platform_id));
+    ret = clGetPlatformIDs(ret_num_platforms, platform_id, &ret_num_platforms);
+    /* try all available platforms */
+    for( i = 0; i < ret_num_platforms; i++){
+        printf("Trying platform %d\n",platform_id[i]);
+        err = clGetDeviceIDs(platform_id[i], DEVICETYPE, 1, &device_id, &ret_num_devices);
+        if (err != CL_SUCCESS) {
+            switch(err) {
+            case CL_INVALID_PLATFORM:
+                printf("invalid platform!");
+                break;
+            case CL_INVALID_VALUE:
+                printf("invalid value");
+                break;
+            case CL_DEVICE_NOT_FOUND:
+                printf("device not found");
+                break;
+            case CL_INVALID_DEVICE_TYPE:
+                if(USEGPU) {
+                    printf("invalid device: GPU\n");
+                } else {
+                    printf("invalid device: CPU\n");
+                }
+                break;
             }
+        } else {
+            printf("Creating device group!\n");
+            foundDevice = 1;
             break;
         }
+    }
+
+    if (!foundDevice){
         printf("Error: Failed to create a device group!\n");
         return EXIT_FAILURE;
     }
 
+    free(platform_id);
     context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
     if (!context) {
         printf("Error: Failed to create a compute context!\n");
@@ -703,7 +716,8 @@ int InitCLDict(CLDict *clDictToInit)
     kernels = calloc(NumberOfKernels, sizeof(cl_kernel));
     buffers = calloc(NumberOfBuffers, sizeof(cl_mem));
     locals = calloc(NumberOfKernels, sizeof(size_t));
-    event_wait_list = calloc(255,sizeof(cl_event));
+    /* event_wait_list = calloc(255,sizeof(cl_event)); */
+    event_wait_list = NULL;
     clDictToInit->kernels = kernels;
     clDictToInit->buffers = buffers;
     clDictToInit->locals = locals;
@@ -736,9 +750,9 @@ int InitCLDict(CLDict *clDictToInit)
             , PFROMPOPFLAGONLY,FREQSCORR,DEBUGCOMPARE,
             FPRIORMEAN,FPRIORSD, NOADMIX,NOALPHA,MAXGROUPS);
     
-		sprintf(options + strlen(options), "-D ONEFST=%d -D ALPHAPROPSD=%ff -D ALPHAMAX=%ff -D UNIFPRIORALPHA=%d -D POPALPHAS=%d -D ALPHAPRIORA=%ff -D ALPHAPRIORB=%ff -D NUMALPHAS=%d -D ANCESTDIST=%d -D NUMBOXES=%d",
+		sprintf(options + strlen(options), "-D ONEFST=%d -D ALPHAPROPSD=%ff -D ALPHAMAX=%ff -D UNIFPRIORALPHA=%d -D POPALPHAS=%d -D ALPHAPRIORA=%ff -D ALPHAPRIORB=%ff -D NUMALPHAS=%d -D ANCESTDIST=%d -D NUMBOXES=%d -D USEGPU=%d ",
         ONEFST,ALPHAPROPSD, ALPHAMAX, UNIFPRIORALPHA, POPALPHAS,
-        ALPHAPRIORA, ALPHAPRIORB, numalphas,ANCESTDIST,NUMBOXES);
+        ALPHAPRIORA, ALPHAPRIORB, numalphas,ANCESTDIST,NUMBOXES, USEGPU);
 
     printf("COMPILING KERNELS WITH:\n");
     printf("%s\n",options);
@@ -799,7 +813,7 @@ void finishCommands(CLDict *clDict, char * name)
 }
 
 void addToWaitList(CLDict *clDict,cl_event event){
-    clDict->event_wait_list[(clDict->num_events_in_waitlist)++] = event;
+    /* clDict->event_wait_list[(clDict->num_events_in_waitlist)++] = event; */
 }
 void finishWaitList(CLDict *clDict){
     finishCommands(clDict,"finishing command list");

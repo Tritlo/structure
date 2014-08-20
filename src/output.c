@@ -132,11 +132,20 @@ DataCollectionCL (CLDict *clDict,int *Geno, int *PreGeno,
         }
     }
 
-    global[0] = MAXPOPS;
+    global[0] = fmin(MAXDIM,MAXPOPS);
+    /* if (ONLYONEDIM){ */
+    /*     global[0] = 1; */
+    /* } */
     runKernel(clDict,DataCollectPopKernel,1,global,"DataCollectionPop");
-    global[1] = NUMINDS;
+    global[1] = fmin(MAXDIM,NUMINDS);
+    /* if (ONLYONEDIM){ */
+    /*     global[1] = 1; */
+    /* } */
     runKernel(clDict,DataCollectIndKernel,2,global,"DataCollectionInd");
-    global[1] = NUMLOCI;
+    global[1] = fmin(MAXDIM,NUMLOCI);
+    /* if (ONLYONEDIM){ */
+    /*     global[1] = 1; */
+    /* } */
     runKernel(clDict,DataCollectLocKernel,2,global,"DataCollectionLoc");
 
     if (COMPUTEPROB) {
@@ -148,19 +157,29 @@ DataCollectionCL (CLDict *clDict,int *Geno, int *PreGeno,
             usesumindlikes = 1;
             setKernelArgExplicit(clDict,CalcLikeKernel,sizeof(int),&usesumindlikes,3);
         }
-        global[1] = NUMINDS;
+        global[1] = fmin(MAXDIM,NUMINDS);
+        /* if (ONLYONEDIM){ */
+        /*     global[1] = 1; */
+        /* } */
 
         /*global[0] = (32 < NUMLOCI) ? 32 : NUMLOCI;*/
         /*global[0] = ( 128 < NUMLOCI) ? 128 : NUMLOCI;*/
 
-        global[0] = pow(2,(int) (log(NUMLOCI)/log(2)));
+        /* global[0] = pow(2,(int) (log(NUMLOCI)/log(2))); */
+        global[0] = fmin(MAXDIM,NUMLOCI);
+        /* if (ONLYONEDIM){ */
+        /*     global[0] = 1; */
+        /* } */
         runKernel(clDict,MapReduceLogLikeKernel,2,global,"LogLike");
 
-        global[0] = NUMINDS;
+        global[0] = fmin(MAXDIM,NUMINDS);
+        /* if (ONLYONEDIM){ */
+        /*     global[0] = 1; */
+        /* } */
         runKernel(clDict,CalcLikeKernel,1,global,"CalcLike");
-        global[0] = 1;
+        global[0] = fmin(MAXDIM,1);
         runKernel(clDict,ComputeProbFinishKernel,1,global,"ComputeProbFinish");
-        global[1] = NUMLOCI;
+        global[1] = fmin(MAXDIM,NUMLOCI);
 
         /*readBuffer(clDict,gpulike, sizeof(float),LIKECL, "like");*/
 

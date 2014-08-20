@@ -8,6 +8,13 @@
 #include "Kernels/KernelErrors.h"
 /*TODO: Determine this number, used for reductions */
 #define MAXGROUPS 31
+#define USEGPU 0
+/* #else */
+#if !USEGPU
+#define MAXDIM 1
+#else
+#define MAXDIM 128
+#endif
 
 enum KERNEL {
     UpdateZKernel,
@@ -78,7 +85,7 @@ typedef struct CLDict {
     cl_mem *buffers;
     cl_program program;
     size_t *locals;
-    cl_platform_id platform_id;
+    cl_platform_id *platform_id;
     cl_uint ret_num_devices;
     cl_uint ret_num_platforms;
     cl_context context;

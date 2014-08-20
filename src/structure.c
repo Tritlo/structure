@@ -429,6 +429,7 @@ int main (int argc, char *argv[])
     /* init buffers on GPU */
     writeBuffer(clDict,P,sizeof(float) * PSIZE,PCL,"P");
     writeBuffer(clDict,Z,sizeof(int)*ZSIZE,ZCL,"Z");
+    writeBuffer(clDict,Q, sizeof(float) * QSIZE,QCL, "Q");
     writeBuffer(clDict,NumAlleles,sizeof(int) * NUMLOCI,NUMALLELESCL,"NumAlleles");
     writeBuffer(clDict,lambda,sizeof(float) * MAXPOPS,LAMBDACL,"LAMBDA");
     if(!RECESSIVEALLELES){

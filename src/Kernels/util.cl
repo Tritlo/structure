@@ -2,6 +2,24 @@
 #include "randGen.cl"
 #define RAND_MAX 4294967296.0f
 
+inline void AtomicInc(__global int *source){
+    atomic_add(source,1);
+}
+
+inline void AtomicAdd(volatile __global float *source, const float operand) {
+    union {
+        unsigned int intVal;
+        float floatVal;
+    } newVal;
+    union {
+        unsigned int intVal;
+        float floatVal;
+    } prevVal;
+    do {
+        prevVal.floatVal = *source;
+        newVal.floatVal = prevVal.floatVal + operand;
+    } while (atomic_cmpxchg((volatile __global unsigned int *)source, prevVal.intVal, newVal.intVal) != prevVal.intVal);
+}
 /*
  * returns a random real in the [lower,upper)
  */
