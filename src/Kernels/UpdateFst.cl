@@ -66,12 +66,13 @@ __kernel void UpdateFst(
             __global float *normals,
             __global uint *randGens,
             __global float *results,
-            __local  float *scratch)
+            __local  float *scratch,
+            const int numfst)
 {
     int pop = get_global_id(1);
     int numgroups = get_num_groups(0);
     float c, y, t;// KahanSum
-    while (pop < MAXPOPS){
+    while (pop < numfst){
         int loc = get_global_id(0);
         float newf = normals[pop];
         /* ensure newf is large enough so we don't cause over/underflow */

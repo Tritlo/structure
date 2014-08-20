@@ -180,7 +180,7 @@ void NonIndependenceUpdateEpsilonCL(CLDict *clDict,float *P, float *Epsilon,
 
     global[0] = fmin(MAXDIM,NUMLOCI);
     /* if (ONLYONEDIM){ */
-    /*     global[0] = 1; */
+    /* global[0] = 1; */
     /* } */
     runKernel(clDict,NonIndUpdateEpsilonKernel,1,global,"Non Ind UpdateEpsilon kernel");
 

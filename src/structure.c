@@ -608,7 +608,6 @@ int main (int argc, char *argv[])
             /* readBuffer(clDict,P, sizeof(float) * PSIZE,PCL, "P"); */
             /* readBuffer(clDict,Fst,sizeof(float) * MAXPOPS,FSTCL,"FST"); */
             /* readBuffer(clDict,Epsilon,sizeof(float) * NUMLOCI*MAXALLELES,EPSILONCL,"eps"); */
-            /* readBuffer(clDict,NumAlleles,sizeof(int) * NUMLOCI,NUMALLELESCL,"NumAlleles"); */
 
             /* UpdateEpsilon(P,Epsilon,Fst,NumAlleles,lambda[0]); */
 

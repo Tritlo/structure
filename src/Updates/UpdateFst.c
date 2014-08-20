@@ -135,6 +135,7 @@ UpdateFstCL (CLDict *clDict,float *Epsilon, float *Fst, float *P, int *NumAllele
     /*     global[0] = 1; */
     /*     global[1] = 1; */
     /* } */
+    setKernelArgExplicit(clDict,UpdateFstKernel,sizeof(int),&numfst,8);
     runKernel(clDict,UpdateFstKernel,2,global,"UpdateFst");
     /*if (rep % 100 == 0){
         readBuffer(clDict,reduceresult,sizeof(float)*MAXGROUPS*NUMINDS*NUMLOCI,REDUCERESULTSCL,"result");
