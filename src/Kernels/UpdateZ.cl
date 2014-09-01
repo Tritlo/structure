@@ -1,4 +1,4 @@
-#include "Kernels/rand.cl"
+#include "rand.cl"
 __kernel void UpdateZ (
     __global float* Q, /* input */
     __global float* P,  /* input */

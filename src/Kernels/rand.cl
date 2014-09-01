@@ -1,4 +1,4 @@
-#include "Kernels/randGen.cl"
+#include "/home/structure/structure/src/Kernels/randGen.cl"
 
 __kernel void Dirichlet(
         __global float *Parameters,
@@ -35,16 +35,18 @@ __kernel void FillArrayWRandom(
         )
 {
     int pos = get_global_id(0);
-    mwc64x_state_t rng = getRandGen(randGens,pos);
+    /* uint rng = getRandGen(randGens,pos); */
     uint i;
     float val;
     ulong samplesPerstream = length/get_global_size(0);
     int offset = pos*samplesPerstream;
+    RndDiscState randState[1];
+    initRndDiscState(randState,randGens,pos);
     if (offset < length){
         for(i = 0; i < samplesPerstream && i+offset < length; i++){
-            randomArr[offset+i] = uintToUnit(MWC64X_NextUint(&rng));
+            randomArr[offset+i] = uintToUnit(getRandUint(randState));
         }
-        saveRandGen(randGens,pos,rng);
+        saveRandGen(randGens,pos,randState);
     }
 }
 

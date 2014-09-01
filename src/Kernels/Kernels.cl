@@ -1,4 +1,4 @@
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+/* #pragma OPENCL EXTENSION cl_khr_fp64 : enable */
 /* #pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable */
 
 //These are inserted during PreProcessingDuringCompilation.
@@ -14,12 +14,22 @@
 #define UNDERFLO 10e-40f
 #define SQUNDERFLO 10e-20f
 
-#include "Kernels/util.cl"
-#include "Kernels/KernelErrors.h"
-#include "Kernels/UpdateZ.cl"
-#include "Kernels/UpdateP.cl"
-#include "Kernels/UpdateQ.cl"
-#include "Kernels/UpdateFst.cl"
-#include "Kernels/UpdateAlpha.cl"
-#include "Kernels/UpdateEpsilon.cl"
-#include "Kernels/DataCollect.cl"
+/* #include "/home/structure/structure/src/Kernels/util.cl" */
+/* #include "/home/structure/structure/src/Kernels/KernelErrors.h" */
+/* #include "/home/structure/structure/src/Kernels/UpdateZ.cl" */
+/* #include "/home/structure/structure/src/Kernels/UpdateP.cl" */
+/* #include "/home/structure/structure/src/Kernels/UpdateQ.cl" */
+/* #include "/home/structure/structure/src/Kernels/UpdateFst.cl" */
+/* #include "/home/structure/structure/src/Kernels/UpdateAlpha.cl" */
+/* #include "/home/structure/structure/src/Kernels/UpdateEpsilon.cl" */
+/* #include "/home/structure/structure/src/Kernels/DataCollect.cl" */
+
+#include "util.cl"
+#include "KernelErrors.h"
+#include "UpdateZ.cl"
+#include "UpdateP.cl"
+#include "UpdateQ.cl"
+#include "UpdateFst.cl"
+#include "UpdateAlpha.cl"
+#include "UpdateEpsilon.cl"
+#include "DataCollect.cl"

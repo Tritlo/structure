@@ -1,41 +1,30 @@
 #ifndef RANDGEN
 #define RANDGEN
-#define MAXRANDVAL 4294967296
+/* #define MAXRANDVAL 4294967296 */
+#define MAXRANDVAL 281474976710656
 
 #define RANDSPERSTREAM 2147483648
 #define PI 3.14159265359f
 
-mwc64x_state_t getRandGen(__global uint *randGens, int id){
-    /*mwc64x_state_t rng = { randGens[id*2] };*/
 
-    /*mwc64x_state_t rng;
-    int offset = randGen*2;
-    rng.x = randGens[id*2];
-    rng.c = randGens[id*2+1];*/
-
-    /* C trickery */
-    return  (mwc64x_state_t) { randGens[id*2] };
+uint getRandGen(__global uint *randGens, int id){
+    return  randGens[id];
 }
-void saveRandGen(__global uint *randGens, int randGen,mwc64x_state_t rng){
-    uint x = rng.x;
-    uint c = rng.c;
-    int offset = randGen*2;
-    randGens[offset]=x;
-    randGens[offset+1]=c;
-
+void saveRandGen(__global uint *randGens, int randGen,uint rng){
+    randGens[randGen]=rng;
 }
 
-float uintToUnit(uint rndint){
-   return (float) rndint / MAXRANDVAL;
+float uintToUnit(uint rnduint){
+   return (float) rnduint / MAXRANDVAL;
 }
 
 
 __kernel void InitRandGens( __global uint *randGens, const int baseOffset)
 {
     int pos = get_global_id(0);
-    mwc64x_state_t rng;
-    MWC64X_SeedStreams(&rng,baseOffset,RANDSPERSTREAM);
-    saveRandGen(randGens,pos,rng);
+    /* mwc64x_state_t rng; */
+    /* MWC64X_SeedStreams(&rng,baseOffset,RANDSPERSTREAM); */
+    /* saveRandGen(randGens,pos,rng); */
 }
 
 /*#if DEBUGCOMPARE
@@ -65,7 +54,7 @@ float rndDisc(RndDiscState * state)
 typedef struct RndDiscState {
     __global uint *randGens;
     int randGenId;
-    mwc64x_state_t rng;
+    uint rng;
 } RndDiscState;
 
 void initRndDiscState(RndDiscState *state, __global uint * randGens, int id)
@@ -75,16 +64,30 @@ void initRndDiscState(RndDiscState *state, __global uint * randGens, int id)
     state->rng = getRandGen(randGens,id);
 }
 
+uint getRandUint(RndDiscState *state){
+    uint a = 25214903917;
+    uint c = 11;
+    uint m = 48;
+    uint x = state->rng;
+    uint xn = (a*x + c) >> 48;
+    state->rng = xn;
+    return xn;
+}
+
+/* uint getRandUint(RndDiscState *state){ */
+/* return MWC64X_NextUint(&(state->rng)); */
+/* } */
+
 float rndDisc(RndDiscState * state)
 {
-    float val = uintToUnit(MWC64X_NextUint(&(state->rng)));
+    uint rand = getRandUint(state);
+    float val = uintToUnit(rand);
     return val;
 }
 
 uint rndUInt(RndDiscState * state)
 {
-    uint val = MWC64X_NextUint(&(state->rng));
-    return val;
+    return getRandUint(state);
 }
 
 float2 BoxMuller(RndDiscState *state)

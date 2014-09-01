@@ -1,4 +1,4 @@
-#include "Kernels/calcLike.cl"
+#include "calcLike.cl"
 
 __kernel void MetroAcceptTest(
         __global float *TestQ,

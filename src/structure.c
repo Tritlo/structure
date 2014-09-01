@@ -150,15 +150,22 @@ void comparePCLandP(CLDict *clDict,float *OrigP,
     free(P);
 }
 
-void initRandGens(CLDict *clDict){
+void initRandGens(CLDict *clDict, unsigned int *randgens){
     size_t global[1];
     int seed = rand();
+    int i = 0;
     global[0] = NUMRANDGENS;
     printf("Seed: %d\n", seed);
     printf("Structure seed: %d\n", SEED);
-    setKernelArgExplicit(clDict,InitRandGenKernel,sizeof(int),&seed,1);
-    runKernel(clDict,InitRandGenKernel,1,global,"InitRandGen");
-    finishCommands(clDict,"init rand gens");
+    /* setKernelArgExplicit(clDict,InitRandGenKernel,sizeof(int),&seed,1); */
+    /* runKernel(clDict,InitRandGenKernel,1,global,"InitRandGen"); */
+    /* finishCommands(clDict,"init rand gens"); */
+    for(i = 0; i < NUMRANDGENS; ++i){
+        randgens[i] = rand();
+    }
+    writeBuffer(clDict,randgens,sizeof(unsigned int) * NUMRANDGENS,RANDGENSCL,"RandGens");
+    printf("Random initialized!\n");
+
 }
 
 
@@ -413,6 +420,7 @@ int main (int argc, char *argv[])
      CL implementation to the original */
     randomArr = calloc(RANDSIZE,sizeof(float));
     randGens = calloc(NUMRANDGENS,sizeof(unsigned int));
+
     Numafrompopscl = calloc(NUMLOCI*MAXPOPS*MAXALLELES,sizeof(int));
     Numlocipopscl = calloc(NUMINDS*MAXPOPS,sizeof(int));
 
@@ -494,10 +502,12 @@ int main (int argc, char *argv[])
 
     /*Initialize Q */
     initQ(Q);
-    initRandGens(clDict);
+    initRandGens(clDict,randGens);
     finishWaitList(clDict);
+    printf("Waitlist finished!\n");
     for (rep = 0; rep < (NUMREPS + BURNIN); rep++) {
 
+        printf("P done.\n");
         /*FillArrayWithRandomCL(clDict,randomArr,NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM);*/
         /*FillArrayWithRandom(randomArr,NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM);*/
         /*FillArrayWithRandom(randomArr,RANDSIZE);*/
@@ -515,6 +525,7 @@ int main (int argc, char *argv[])
             UpdatePCL (clDict,P, Epsilon, Fst, NumAlleles, Geno, Z, lambda,
                        Individual,
                        randomArr);
+            printf("P done.\n");
         /* }  else { */
         /*     readBuffer(clDict,randomArr, */
         /*             sizeof(float) * NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM,RANDCL, */
@@ -532,6 +543,7 @@ int main (int argc, char *argv[])
             writeBuffer(clDict,Numlocipopscl,sizeof(int)*NUMINDS*MAXPOPS,NUMLOCIPOPSCL,"NUMLOCIPOPS");
             UpdateQCL (clDict,Geno, PreGeno, Q, P, Z, Alpha, rep, Individual, UsePopProbs,
                      Recessive, LocPrior,randomArr);
+            printf("Q done.\n");
         }
 
         if (LOCPRIOR && UPDATELOCPRIOR) {
@@ -564,6 +576,7 @@ int main (int argc, char *argv[])
             /* } */
             /* if (USEWORKINGCL) { */
                 UpdateZCL (clDict,Z,  Q, P, Geno,randomArr);
+                printf("Z done.\n");
                 /* Not needed */
                 /*readBuffer(clDict,Z,sizeof(int)*ZSIZE,ZCL,"Z");*/
             /* } else { */
@@ -588,6 +601,7 @@ int main (int argc, char *argv[])
             /* UpdateAlpha(Q, Alpha, Individual, rep); */
 
             /* writeBuffer(clDict,Alpha, sizeof(float) * MAXPOPS,ALPHACL, "alpha"); */
+            printf("Alpha done.\n");
         }
 
         if (INFERLAMBDA) {
@@ -603,7 +617,9 @@ int main (int argc, char *argv[])
         if (FREQSCORR) {
             UpdateEpsilonCL(clDict,P,Epsilon,Fst,NumAlleles,lambda[0]);
 
+            printf("Eps done.\n");
             UpdateFstCL (clDict,Epsilon, Fst, P, NumAlleles);
+            printf("Fst done.\n");
 
             /* readBuffer(clDict,P, sizeof(float) * PSIZE,PCL, "P"); */
             /* readBuffer(clDict,Fst,sizeof(float) * MAXPOPS,FSTCL,"FST"); */

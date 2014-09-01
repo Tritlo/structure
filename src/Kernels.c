@@ -672,7 +672,9 @@ void createCLBuffers(CLDict *clDict)
 
     createCLBuffer(clDict,TESTQCL,sizeof(float),QSIZE,CL_MEM_READ_WRITE);
     createCLBuffer(clDict,RANDCL,sizeof(float),RANDSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,RANDGENSCL,sizeof(unsigned int),NUMRANDGENS*2,CL_MEM_READ_WRITE);
+
+    createCLBuffer(clDict,RANDGENSCL,sizeof(unsigned int),NUMRANDGENS,CL_MEM_READ_WRITE);
+
     createCLBuffer(clDict,ERRORCL,sizeof(int),2,CL_MEM_READ_WRITE);
 
     createCLBuffer(clDict,LOGLIKESCL,sizeof(float),NUMINDS,CL_MEM_READ_WRITE);
@@ -687,6 +689,14 @@ void createCLBuffers(CLDict *clDict)
 }
 
 
+static struct { cl_platform_info param; const char *name; } props[] = {
+  { CL_PLATFORM_PROFILE, "profile" },
+  { CL_PLATFORM_VERSION, "version" },
+  { CL_PLATFORM_NAME, "name" },
+  { CL_PLATFORM_VENDOR, "vendor" },
+  { CL_PLATFORM_EXTENSIONS, "extensions" },
+  { 0, NULL },
+};
 /*
  * Inits the dict, but the program must still be compiled.
  */
@@ -703,8 +713,13 @@ int InitCLDict(CLDict *clDictToInit)
     cl_device_id device_id;
     cl_command_queue commands;
     cl_event *event_wait_list;
+    cl_platform_id platform;
     int err;
     int i;
+    int ii;
+    char buf[65536];
+    size_t size;
+    cl_int status;
     int foundDevice = 0;
     int compileret;
     char options[1024];
@@ -715,7 +730,15 @@ int InitCLDict(CLDict *clDictToInit)
     ret = clGetPlatformIDs(ret_num_platforms, platform_id, &ret_num_platforms);
     /* try all available platforms */
     for( i = 0; i < ret_num_platforms; i++){
-        printf("Trying platform %d\n",platform_id[i]);
+        printf("Trying platform %d\n",i);
+        platform = platform_id[i];
+       for (ii = 0; props[ii].name != NULL; ii++) {
+          status = clGetPlatformInfo(platform, props[ii].param, sizeof buf, buf, &size);
+          if (status != CL_SUCCESS) {
+             continue;
+          }
+          printf("platform[%p]: %s: %s\n", platform, props[ii].name, buf);
+       }
         err = clGetDeviceIDs(platform_id[i], DEVICETYPE, 1, &device_id, &ret_num_devices);
         if (err != CL_SUCCESS) {
             switch(err) {
@@ -800,7 +823,7 @@ int InitCLDict(CLDict *clDictToInit)
             , PFROMPOPFLAGONLY,FREQSCORR,DEBUGCOMPARE,
             FPRIORMEAN,FPRIORSD, NOADMIX,NOALPHA,MAXGROUPS);
     
-		sprintf(options + strlen(options), "-D ONEFST=%d -D ALPHAPROPSD=%ff -D ALPHAMAX=%ff -D UNIFPRIORALPHA=%d -D POPALPHAS=%d -D ALPHAPRIORA=%ff -D ALPHAPRIORB=%ff -D NUMALPHAS=%d -D ANCESTDIST=%d -D NUMBOXES=%d -D USEGPU=%d ",
+		sprintf(options + strlen(options), "-D ONEFST=%d -D ALPHAPROPSD=%ff -D ALPHAMAX=%ff -D UNIFPRIORALPHA=%d -D POPALPHAS=%d -D ALPHAPRIORA=%ff -D ALPHAPRIORB=%ff -D NUMALPHAS=%d -D ANCESTDIST=%d -D NUMBOXES=%d -D USEGPU=%d -I Kernels ",
         ONEFST,ALPHAPROPSD, ALPHAMAX, UNIFPRIORALPHA, POPALPHAS,
         ALPHAPRIORA, ALPHAPRIORB, numalphas,ANCESTDIST,NUMBOXES, USEGPU);
 
