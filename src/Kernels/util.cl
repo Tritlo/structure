@@ -1,4 +1,4 @@
-#include "mwc64x.cl"
+/* #include "mwc64x.cl" */
 #include "randGen.cl"
 #define RAND_MAX 4294967296.0f
 
@@ -23,13 +23,13 @@ inline void AtomicAdd(volatile __global float *source, const float operand) {
 /*
  * returns a random real in the [lower,upper)
  */
-float randomReal(float lower, float upper,mwc64x_state_t *randState)
+float randomReal(float lower, float upper,RndDiscState *randState)
 {
     uint randVal;
     float randPercent;
     float random;
 
-    randVal = MWC64X_NextUint(randState);
+    randVal = getRandUint(randState);
     randPercent = (float) randVal/(RAND_MAX +1);
     return (lower + randPercent*(upper-lower));
 }

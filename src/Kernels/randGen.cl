@@ -1,8 +1,8 @@
 #ifndef RANDGEN
 #define RANDGEN
 /* #define MAXRANDVAL 4294967296 */
-#define MAXRANDVAL 281474976710656
-
+/* #define MAXRANDVAL 281474976710656 */
+#define MAXRANDVAL 2147483647
 #define RANDSPERSTREAM 2147483648
 #define PI 3.14159265359f
 
@@ -65,11 +65,16 @@ void initRndDiscState(RndDiscState *state, __global uint * randGens, int id)
 }
 
 uint getRandUint(RndDiscState *state){
-    uint a = 25214903917;
-    uint c = 11;
-    uint m = 48;
+    /* Drand 48 */
+    /* uint a = 25214903917; */
+    /* uint c = 11; */
+    /* uint m = pow(2,48) */
+    /* GGL */
+    uint a = 16807;
+    uint c = 0;
+    uint m = 2147483647;
     uint x = state->rng;
-    uint xn = (a*x + c) >> 48;
+    uint xn = (a*x + c) % m;
     state->rng = xn;
     return xn;
 }
