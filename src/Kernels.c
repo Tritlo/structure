@@ -580,10 +580,17 @@ void finishCommands(CLDict *clDict, char * name)
 }
 
 void addToWaitList(CLDict *clDict,cl_event event){
+    clReleaseEvent(event);
     /* clDict->event_wait_list[(clDict->num_events_in_waitlist)++] = event; */
 }
 void finishWaitList(CLDict *clDict){
+    /* int i = 0; */
     finishCommands(clDict,"finishing command list");
+    /* for(i = 0; i < clDict->num_events_in_waitlist; ++i) */
+    /* { */
+    /*     clReleaseEvent(clDict->event_wait_list[i]); */
+    /* } */
+
     clDict->num_events_in_waitlist=0;
 }
 
@@ -684,8 +691,13 @@ void createCLBuffers(CLDict *clDict)
     createCLBuffer(clDict,LIKECL,sizeof(float),1,CL_MEM_READ_WRITE);
     createCLBuffer(clDict,SUMLIKESCL,sizeof(float),1,CL_MEM_WRITE_ONLY);
     createCLBuffer(clDict,SUMSQLIKESCL,sizeof(float),1,CL_MEM_WRITE_ONLY);
-
-    createCLBuffer(clDict,ANCESTDISTCL,sizeof(int),NUMINDS*MAXPOPS*NUMBOXES,CL_MEM_WRITE_ONLY);
+    
+    if (ANCESTDIST){
+        createCLBuffer(clDict,ANCESTDISTCL,sizeof(int),NUMINDS*MAXPOPS*NUMBOXES,CL_MEM_WRITE_ONLY);
+    }
+    else {
+        createCLBuffer(clDict,ANCESTDISTCL,sizeof(int),1,CL_MEM_WRITE_ONLY);
+    }
 }
 
 

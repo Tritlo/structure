@@ -249,10 +249,10 @@ int main (int argc, char *argv[])
     float * randomArr; /* array of random numbers */
     int POPFLAGINDS = 0;
     float invsqrtnuminds;
-    enum BUFFER buffers[5];
-    char         *names[5];
-    size_t        sizes[5];
-    void         *dests[5];
+    /* enum BUFFER buffers[5]; */
+    /* char         *names[5]; */
+    /* size_t        sizes[5]; */
+    /* void         *dests[5]; */
 
     float  *reduceresult;
     int *Numafrompopscl;

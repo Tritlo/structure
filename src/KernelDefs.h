@@ -13,7 +13,7 @@
 #if !USEGPU
 #define MAXDIM 1
 #else
-#define MAXDIM 256
+#define MAXDIM 32
 #endif
 
 enum KERNEL {

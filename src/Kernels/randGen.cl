@@ -74,6 +74,7 @@ uint getRandUint(RndDiscState *state){
     uint c = 0;
     uint m = 2147483647;
     uint x = state->rng;
+    /* uint xn = (a*x + c) % m; */
     uint xn = (a*x + c) % m;
     state->rng = xn;
     return xn;

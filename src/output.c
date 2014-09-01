@@ -113,10 +113,11 @@ DataCollectionCL (CLDict *clDict,int *Geno, int *PreGeno,
                 float *LocPrior, float *sumLocPrior, int LocPriorLen,
                 float *sumindlikes, float *indlikes_norm, int rep)
 {
-    int ind, pop, loc, pos;
+    int ind;
+    /* int pop, loc, pos; */
     int i;
     int usesumindlikes;
-    float gpulike[1];
+    /* float gpulike[1]; */
     size_t global[2];
 
     if (LOCPRIOR){
@@ -679,7 +680,7 @@ UpdateSums (float *Q, float *QSum, int *Z, float *P, float *PSum,
             float *sumLocPrior, int LocPriorLen)
 {
     int loc, ind, pop, allele, box, i;
-      int line; 
+      /* int line; */ 
 
     for (pop=0; pop<MAXPOPS; pop++) {
         sumlambda[pop] += lambda[pop];
