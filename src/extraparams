@@ -83,7 +83,7 @@ OUTPUT OPTIONS
 
 #define PRINTQHAT    0  // (B) Q-hat printed to a separate file.  Turn this 
                            on before using STRAT.
-#define UPDATEFREQ   100  // (int) frequency of printing update on the screen.
+#define UPDATEFREQ   1  // (int) frequency of printing update on the screen.
                                  Set automatically if this is 0.
 #define PRINTLIKES   0  // (B) print current likelihood to screen every rep
 #define INTERMEDSAVE 0  // (int) number of saves to file during run

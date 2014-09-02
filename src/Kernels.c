@@ -302,8 +302,8 @@ void setKernelArgs(CLDict *clDict)
     setKernelArg(clDict,UpdQDirichletKernel,POPFLAGCL,4);
 
     /* FillArrayWithRandom dirichlet */
-    setKernelArg(clDict,FillArrayWRandomKernel,RANDCL,0);
-    setKernelArg(clDict,FillArrayWRandomKernel,RANDGENSCL,1);
+    /* setKernelArg(clDict,FillArrayWRandomKernel,RANDCL,0); */
+    /* setKernelArg(clDict,FillArrayWRandomKernel,RANDGENSCL,1); */
 
     /*Init rand gens */
     setKernelArg(clDict,InitRandGenKernel,RANDGENSCL,0);
@@ -503,7 +503,8 @@ int CompileKernels(CLDict *clDict,  char *options)
         ,"DataCollectInd","DataCollectLoc","CalcLike","ComputeProbFinish","mapReduceLogLike"};
 
     /* Load the source code containing the kernels*/
-    fp = fopen("Kernels/Kernels.cl", "r");
+    /* fp = fopen("Kernels/Kernels.cl", "r"); */
+    fp = fopen("Kernels/OneKernels.cl", "r");
     if (!fp) {
         fprintf(stderr, "Failed to load kernel file Kernels.cl\n");
         return EXIT_FAILURE;
@@ -580,7 +581,7 @@ void finishCommands(CLDict *clDict, char * name)
 }
 
 void addToWaitList(CLDict *clDict,cl_event event){
-    clReleaseEvent(event);
+    /* clReleaseEvent(event); */
     /* clDict->event_wait_list[(clDict->num_events_in_waitlist)++] = event; */
 }
 void finishWaitList(CLDict *clDict){
@@ -609,7 +610,7 @@ void writeBuffer(CLDict *clDict, void * source, size_t size,
     err = clEnqueueWriteBuffer(clDict->commands, clDict->buffers[dest], CL_FALSE,
                                0,
                                size,source,
-                               clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+                               clDict->num_events_in_waitlist, clDict->event_wait_list, NULL );
     addToWaitList(clDict,event);
     strcpy(msg,"Failed to write buffer: ");
     strcat(msg,name);
@@ -678,7 +679,7 @@ void createCLBuffers(CLDict *clDict)
     createCLBuffer(clDict,ALPHASUMCL,sizeof(float),MAXPOPS,CL_MEM_WRITE_ONLY);
 
     createCLBuffer(clDict,TESTQCL,sizeof(float),QSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,RANDCL,sizeof(float),RANDSIZE,CL_MEM_READ_WRITE);
+    /* createCLBuffer(clDict,RANDCL,sizeof(float),RANDSIZE,CL_MEM_READ_WRITE); */
 
     createCLBuffer(clDict,RANDGENSCL,sizeof(unsigned int),NUMRANDGENS,CL_MEM_READ_WRITE);
 
@@ -835,7 +836,7 @@ int InitCLDict(CLDict *clDictToInit)
             , PFROMPOPFLAGONLY,FREQSCORR,DEBUGCOMPARE,
             FPRIORMEAN,FPRIORSD, NOADMIX,NOALPHA,MAXGROUPS);
     
-		sprintf(options + strlen(options), "-D ONEFST=%d -D ALPHAPROPSD=%ff -D ALPHAMAX=%ff -D UNIFPRIORALPHA=%d -D POPALPHAS=%d -D ALPHAPRIORA=%ff -D ALPHAPRIORB=%ff -D NUMALPHAS=%d -D ANCESTDIST=%d -D NUMBOXES=%d -D USEGPU=%d -I Kernels ",
+		sprintf(options + strlen(options), "-D ONEFST=%d -D ALPHAPROPSD=%ff -D ALPHAMAX=%ff -D UNIFPRIORALPHA=%d -D POPALPHAS=%d -D ALPHAPRIORA=%ff -D ALPHAPRIORB=%ff -D NUMALPHAS=%d -D ANCESTDIST=%d -D NUMBOXES=%d -D USEGPU=%d -I Kernels -g",
         ONEFST,ALPHAPROPSD, ALPHAMAX, UNIFPRIORALPHA, POPALPHAS,
         ALPHAPRIORA, ALPHAPRIORB, numalphas,ANCESTDIST,NUMBOXES, USEGPU);
 
@@ -903,7 +904,7 @@ void readBuffer(CLDict *clDict, void * dest, size_t size, enum BUFFER source,
     cl_event event;
     err = clEnqueueReadBuffer(clDict->commands, clDict->buffers[source], CL_TRUE,
                               0,
-                              size, dest, clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+                              size, dest, clDict->num_events_in_waitlist, clDict->event_wait_list, NULL );
     addToWaitList(clDict,event);
     strcpy(msg,"Failed to read buffer: ");
     strcat(msg,name);
@@ -928,7 +929,7 @@ void readBuffers(CLDict *clDict, void * dest[], size_t size[], enum BUFFER sourc
     for(buff =0; buff < numbufferstoread; buff++){
         err = clEnqueueReadBuffer(clDict->commands, clDict->buffers[source[buff]], CL_FALSE,
                                   0,
-                                  size[buff], dest[buff], clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+                                  size[buff], dest[buff], clDict->num_events_in_waitlist, clDict->event_wait_list, NULL );
         addToWaitList(clDict,event);
         strcpy(msg,"Failed to read buffer: ");
         strcat(msg,name[buff]);
@@ -954,7 +955,7 @@ void runKernel(CLDict *clDict, enum KERNEL kernel, int numdims, size_t *dims,
     cl_event event;
     err = clEnqueueNDRangeKernel(clDict->commands, clDict->kernels[kernel],
                                  numdims, NULL, dims, NULL,
-                               clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+                               clDict->num_events_in_waitlist, clDict->event_wait_list, NULL );
     addToWaitList(clDict,event);
     strcpy(msg,"Failed to run kernel: ");
     strcat(msg,name);
@@ -970,7 +971,7 @@ void runTask(CLDict *clDict, enum KERNEL kernel, char *name)
     char msg[120];
     cl_event event;
     err = clEnqueueTask(clDict->commands, clDict->kernels[kernel],
-                               clDict->num_events_in_waitlist, clDict->event_wait_list, &event );
+                               clDict->num_events_in_waitlist, clDict->event_wait_list, NULL );
     addToWaitList(clDict,event);
     strcpy(msg,"Failed to run task: ");
     strcat(msg,name);

@@ -168,6 +168,9 @@ void initRandGens(CLDict *clDict, unsigned int *randgens){
 
 }
 
+void breakP(CLDict *clDict){
+    clReleaseEvent(NULL);
+}
 
 /*=============MAIN======================================*/
 
@@ -506,6 +509,7 @@ int main (int argc, char *argv[])
     finishWaitList(clDict);
     printf("Waitlist finished!\n");
     for (rep = 0; rep < (NUMREPS + BURNIN); rep++) {
+        breakP(clDict);
 
         /*FillArrayWithRandomCL(clDict,randomArr,NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM);*/
         /*FillArrayWithRandom(randomArr,NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM);*/

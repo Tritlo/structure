@@ -13,6 +13,7 @@
 
 #define UNDERFLO 10e-40f
 #define SQUNDERFLO 10e-20f
+#define DELTA 10e-5f
 
 /* #include "/home/structure/structure/src/Kernels/util.cl" */
 /* #include "/home/structure/structure/src/Kernels/KernelErrors.h" */
