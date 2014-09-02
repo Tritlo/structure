@@ -8,12 +8,12 @@
 #include "Kernels/KernelErrors.h"
 /*TODO: Determine this number, used for reductions */
 #define MAXGROUPS 31
-#define USEGPU 1
+#define USEGPU 0
 /* #else */
 #if !USEGPU
 #define MAXDIM 1
 #else
-#define MAXDIM 32
+#define MAXDIM 128
 #endif
 
 enum KERNEL {

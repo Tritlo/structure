@@ -94,37 +94,41 @@ void initRndDiscState(RndDiscState *state, __global uint * randGens, int id)
     state->rng = getRandGen(randGens,id);
 }
 
-uint getRandUint(RndDiscState *state){
+uint rndUInt(RndDiscState *state){
     /* Drand 48 */
-    /* uint a = 25214903917; */
-    /* uint c = 11; */
-    /* uint m = pow(2,48) */
+    /* const unsigned int a = 25214903917; */
+    /* const unsigned int c = 11; */
+    /* const unsigned int m = 281474976710656 -1; */
     /* GGL */
-    uint a = 16807;
-    uint c = 0;
-    uint m = 2147483647;
+    const uint a = 16807;
+    const uint c = 0;
+    const uint m = 2147483647;
     uint x = state->rng;
     /* uint xn = (a*x + c) % m; */
-    uint xn = (a*x + c) % m;
+    /* uint xn = (a*x + c) & m; */
+    uint xn = a*x % m;
     state->rng = xn;
+    /* printf("%d, id: %d\n",xn,state->randGenId); */
+    /* printf("%d, %d\n",get_global_id(0),get_global_id(1)); */
     return xn;
 }
 
-/* uint getRandUint(RndDiscState *state){ */
+/* uint rndUInt(RndDiscState *state){ */
 /* return MWC64X_NextUint(&(state->rng)); */
 /* } */
 
 float rndDisc(RndDiscState * state)
 {
-    uint rand = getRandUint(state);
-    float val = uintToUnit(rand);
-    return val;
+    /* uint rand = rndUInt(state); */
+    /* float val = uintToUnit(rand); */
+    /* printf("%f\n",val); */
+    return uintToUnit(rndUInt(state));
 }
 
-uint rndUInt(RndDiscState * state)
-{
-    return getRandUint(state);
-}
+/* uint rndUInt(RndDiscState * state) */
+/* { */
+/*     return rndUInt(s/ate); */
+/* } */
 
 float2 BoxMuller(RndDiscState *state)
 {
@@ -181,7 +185,7 @@ float randomReal(float lower, float upper,RndDiscState *randState)
     float randPercent;
     float random;
 
-    randVal = getRandUint(randState);
+    randVal = rndUInt(randState);
     randPercent = (float) randVal/(RAND_MAX +1);
     return (lower + randPercent*(upper-lower));
 }
@@ -280,6 +284,7 @@ float RGammaDiscFloat(float n,RndDiscState *randState){
     float E=2.71828182f;
     float b=(n+E)/E;
     float p=0.0f;
+    /* int counter = 0; */
     while(1){
         p=b*rndDisc(randState);
         if(p>1) {
@@ -295,6 +300,11 @@ float RGammaDiscFloat(float n,RndDiscState *randState){
                 break;
             }
         }
+        /* counter += 1; */
+        /* if (counter >= 5000){ */
+        /*     printf("To many iterations reached!%d\n",0); */
+        /*     return x; */
+        /* } */
     }
     return x;
 }
@@ -565,6 +575,7 @@ __kernel void Dirichlet(
         __global uint *randGens,
         __global float *TestQ)
 {
+    /* printf("Kernel: Dirichlet\n"); */
     int ind = get_global_id(0);
     RndDiscState randState[1];
 
@@ -583,7 +594,7 @@ __kernel void Dirichlet(
             TestQ[i+offset] = GammaSample[i]/sum;
         }
         saveRndDiscState(randState);
-        ind += get_global_size(0);
+        ind +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
     }
 }
 
@@ -604,7 +615,7 @@ __kernel void FillArrayWRandom(
     initRndDiscState(randState,randGens,pos);
     if (offset < length){
         for(i = 0; i < samplesPerstream && i+offset < length; i++){
-            randomArr[offset+i] = uintToUnit(getRandUint(randState));
+            randomArr[offset+i] = uintToUnit(rndUInt(randState));
         }
         saveRandGen(randGens,pos,randState);
     }
@@ -617,6 +628,7 @@ __kernel void PopNormals(
         const float SD,
         const int length)
 {
+    /* printf("Kernel: popnorms\n"); */
     RndDiscState randState[1];
     initRndDiscState(randState,randGens,0);
     int i;
@@ -643,6 +655,7 @@ __kernel void UpdateZ (
     __global int* error
 )
 {
+    /* printf("Kernel: Updatez\n"); */
     int allele;
     int pop;
     int line;
@@ -673,9 +686,9 @@ __kernel void UpdateZ (
                 }
             }
             saveRndDiscState(randState);
-            loc += get_global_size(1);
+            loc +=  get_global_size(1);// > 1 ? get_global_size(1) : 1;
         }
-        ind += get_global_size(0);
+        ind +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
     }
 }
 
@@ -689,6 +702,7 @@ __kernel void GetNumFromPops (
     __global int* error
 )
 {
+    /* printf("Kernel: getnumfrompops\n"); */
     int loc = get_global_id(1);
     while (loc < NUMLOCI){
         int offset = loc*MAXPOPS*MAXALLELES;
@@ -716,9 +730,9 @@ __kernel void GetNumFromPops (
 
                 }
             }
-            ind += get_global_size(0);
+            ind +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
         }
-        loc += get_global_size(1);
+        loc +=  get_global_size(1);// > 1 ? get_global_size(1) : 1;
     }
 }
 
@@ -736,6 +750,7 @@ __kernel void UpdateP (
     #endif
 )
 {
+    /* printf("Kernel: UpdateP\n"); */
     int loc = get_global_id(0);
     float Parameters[MAXALLELES];
     RndDiscState randState[1];
@@ -771,9 +786,9 @@ __kernel void UpdateP (
                                P + PPos (loc, pop, 0),
                                randState);
             saveRndDiscState(randState);
-            pop += get_global_size(1);
+            pop +=  get_global_size(1);// > 1 ? get_global_size(1) : 1;
         }
-        loc += get_global_size(0);
+        loc +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
     }
 }
 
@@ -897,6 +912,7 @@ __kernel void mapReduceLogDiffs(__global float *Q,
                                 __global float *results,
                                 __local  float *scratch)
 {
+    /* printf("Kernel: mapredlogdiffs\n"); */
     int ind = get_global_id(1);
     while (ind < NUMINDS){
         int numgroups = get_num_groups(0);
@@ -912,7 +928,7 @@ __kernel void mapReduceLogDiffs(__global float *Q,
             t = logdiff+y;
             c = (t - logdiff) - y;
             logdiff = t;
-            loc += get_global_size(0);
+            loc +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
         }
 
         /* reduce locally */
@@ -949,14 +965,14 @@ __kernel void mapReduceLogDiffs(__global float *Q,
 
         /* reduce over the groups into final result */
         barrier(CLK_GLOBAL_MEM_FENCE);
-        if(gid==0){
+        if( localLoc==0 && gid==0 ){
             logdiffs[ind] = 0;
             for(int id =0; id < numgroups; id ++){
                 logdiffs[ind] += results[ind*numgroups + id];
                 results[ind*numgroups + id] = 0;
             }
         }
-        ind += get_global_size(1);
+        ind +=  get_global_size(1);// > 1 ? get_global_size(1) : 1;
     }
 }
 
@@ -1017,6 +1033,8 @@ __kernel void mapReduceLogLike(__global float *Q,
                                 __global float *results,
                                 __local  float *scratch)
 {
+
+    /* printf("Kernel: mapredloglike %d\n",0); */
     int ind = get_global_id(1);
     while (ind < NUMINDS){
         int loc = get_global_id(0);
@@ -1035,7 +1053,7 @@ __kernel void mapReduceLogLike(__global float *Q,
                 t = logterm + y;
                 c = (t - logterm) - y;
                 logterm = t;
-                loc += get_global_size(0);
+                loc +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
             }
 
             /* reduce locally */
@@ -1072,7 +1090,7 @@ __kernel void mapReduceLogLike(__global float *Q,
 
             /* reduce over the groups into final result */
             barrier(CLK_GLOBAL_MEM_FENCE);
-            if(gid==0){
+            if(localLoc==0 && gid==0 ){
                 loglikes[ind] = 0;
                 for(int id =0; id < numgroups; id ++){
                     loglikes[ind] += results[ind*numgroups + id];
@@ -1080,7 +1098,7 @@ __kernel void mapReduceLogLike(__global float *Q,
                 }
             }
         }
-        ind += get_global_size(1);
+        ind +=  get_global_size(1);// > 1 ? get_global_size(1) : 1;
     }
 }
 
@@ -1094,6 +1112,7 @@ __kernel void CalcLike(
         __local  float *scratch
         )
 {
+    /* printf("Kernel: calclike\n"); */
     int ind = get_global_id(0);
 
     float logterm = 0.0f;
@@ -1114,7 +1133,7 @@ __kernel void CalcLike(
         t = logterm + y;
         c = (t - logterm) - y;
         logterm = t;
-        ind += get_global_size(0);
+        ind +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
     }
 
     int localLoc = get_local_id(0);
@@ -1149,7 +1168,7 @@ __kernel void CalcLike(
 
     /* reduce over the groups into final result */
     barrier(CLK_GLOBAL_MEM_FENCE);
-    if(gid==0){
+    if(localLoc==0 && gid==0 ){
         loglike[0] = 0;
         for(int id =0; id < numgroups; id++){
             loglike[0] += results[id];
@@ -1165,6 +1184,7 @@ __kernel void MetroAcceptTest(
         __global float *logdiffs,
         __global int *popflags)
 {
+    /* printf("Kernel: metacctest\n"); */
     int ind = get_global_id(0);
     int pop;
     RndDiscState randState[1];
@@ -1179,7 +1199,7 @@ __kernel void MetroAcceptTest(
             }
         }
         saveRndDiscState(randState);
-        ind += get_global_size(0);
+        ind +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
     }
 }
 
@@ -1188,6 +1208,7 @@ __kernel void GetNumLociPops(
         __global int *popflags,
         __global int *NumLociPops)
 {
+    /* printf("Kernel: getnumlocipops\n"); */
     int ind = get_global_id(0);
 
     while(ind < NUMINDS){
@@ -1212,9 +1233,9 @@ __kernel void GetNumLociPops(
                     }
                 }
             }
-            loc += get_global_size(1);
+            loc +=  get_global_size(1);// > 1 ? get_global_size(1) : 1;
         }
-        ind += get_global_size(0);
+        ind +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
     }
 }
 
@@ -1225,6 +1246,7 @@ __kernel void UpdQDirichlet(
         __global float *Q,
         __global int *popflags)
 {
+    /* printf("Kernel: updqdir\n"); */
     int ind = get_global_id(0);
     RndDiscState randState[1];
     //TODO: Add PopFlag here
@@ -1246,7 +1268,7 @@ __kernel void UpdQDirichlet(
                 Q[i+offset] = GammaSample[i]/sum;
             }
             saveRndDiscState(randState);
-            ind += get_global_size(0);
+            ind +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
         }
     }
 }
@@ -1323,6 +1345,7 @@ __kernel void UpdateFst(
             __local  float *scratch,
             const int numfst)
 {
+    /* printf("Kernel: updatefst\n"); */
     int pop = get_global_id(1);
     int numgroups = get_num_groups(0);
     float c, y, t;// KahanSum
@@ -1330,7 +1353,7 @@ __kernel void UpdateFst(
         int loc = get_global_id(0);
         float newf = normals[pop];
         /* ensure newf is large enough so we don't cause over/underflow */
-        if (newf > 0 + DELTA && newf < 1.0f - DELTA){
+        if (newf > DELTA && newf < 1.0f - DELTA){
             float sum = 0.0f;
             int redpop;
             int numredpops;
@@ -1357,7 +1380,7 @@ __kernel void UpdateFst(
                 t = sum + y;
                 c = (t - sum) -y;
                 sum = t;
-                loc += get_global_size(0);
+                loc +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
             }
             /* reduce locally */
             int localLoc = get_local_id(0);
@@ -1392,7 +1415,7 @@ __kernel void UpdateFst(
             }
 
             barrier(CLK_GLOBAL_MEM_FENCE);
-            if(gid==0){
+            if(localLoc==0&&gid==0){
                 RndDiscState randState[1];
                 initRndDiscState(randState,randGens,pop);
                 int multiple = 1;
@@ -1412,7 +1435,7 @@ __kernel void UpdateFst(
                 saveRndDiscState(randState);
             }
         }
-        pop += get_global_size(1);
+        pop +=  get_global_size(1);// > 1 ? get_global_size(1) : 1;
         barrier(CLK_GLOBAL_MEM_FENCE);
     }
 }
@@ -1437,6 +1460,7 @@ __kernel void UpdateAlpha(
        __local float *scratch,
        const int POPFLAGINDS)
 {
+    /* printf("Kernel: Update alpha\n"); */
     int alpha = get_global_id(1);
     float c, y, t; // KahanSum
     while( alpha < NUMALPHAS){
@@ -1486,7 +1510,7 @@ __kernel void UpdateAlpha(
                         /* c = (t-total) - y; */
                         /* total = t; */
 
-                        ind += get_global_size(0);
+                        ind +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
                     }
                 }
 
@@ -1527,7 +1551,7 @@ __kernel void UpdateAlpha(
                 //Possibly by reducing with global barrier.
 
                 barrier(CLK_GLOBAL_MEM_FENCE);
-                if(gid==0){
+                if(localId == 0&& gid==0 ){
                     RndDiscState randState[1];
                     initRndDiscState(randState,randGens,alpha);
                     for (int i=0; i<MAXPOPS; i++)  {
@@ -1559,7 +1583,7 @@ __kernel void UpdateAlpha(
                     /*lpsum -= (lgamma (alphasum) - multiple * lgamma ( oldalpha)) * POPFLAGINDS;
                       lpsum += (lgamma (sumalphas) - multiple * lgamma ( newalpha)) * POPFLAGINDS;*/
                     logprobdiff += lpsum;
-
+                    /* printf("UpdateAlpha %d %f %f %d %d %d %d\n",alpha,logprobdiff,newalpha,get_group_id(0), get_group_id(1), get_num_groups(0), get_num_groups(1)); */
                     if (rndDisc(randState) < exp(logprobdiff)) {   /*accept new f */
                         for(redpop = alpha; redpop < numredpops; redpop++){
                             Alpha[redpop] = newalpha;
@@ -1569,7 +1593,7 @@ __kernel void UpdateAlpha(
                 }
             }
         }
-        alpha += get_global_size(1);
+        alpha +=  get_global_size(1);// > 1 ? get_global_size(1) : 1;
         barrier(CLK_GLOBAL_MEM_FENCE);
     }
 }
@@ -1587,6 +1611,7 @@ __kernel void NonIndUpdateEpsilon(
         __global float *lambdas,
         const float invsqrtnuminds)
 {
+    /* printf("Kernel: nonindupdeps\n"); */
 
     int loc = get_global_id(0);
     int allele1,allele2;
@@ -1673,7 +1698,7 @@ __kernel void NonIndUpdateEpsilon(
                 }
             }
         }
-        loc += get_global_size(0);
+        loc +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
         barrier(CLK_GLOBAL_MEM_FENCE);
     }
     saveRndDiscState(randState);
@@ -1703,6 +1728,7 @@ __kernel void DataCollectPop(
        __global float *FstSum
        )
 {
+    /* printf("Kernel: datacp\n"); */
     int pop = get_global_id(0);
     while (pop < MAXPOPS) {
         UpdateSumsPop(lambda,lambdaSum,Fst,FstSum,pop);
@@ -1722,7 +1748,7 @@ __kernel void DataCollectPop(
                     sumLocPrior[i] += LocPrior[i];
                 }
         }*/
-        pop += get_global_size(0);
+        pop +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
     }
 }
 
@@ -1739,7 +1765,7 @@ void UpdateSumsInd (
     QSum[QPos (ind, pop)] += Q[QPos (ind, pop)];
     if (ANCESTDIST) {
         int box = ((int) (Q[QPos (ind, pop)] * ((float) NUMBOXES)));
-        /*printf("%1.3f__%d  ",Q[QPos(ind,pop)],box); */
+        /*printf("Kernel: %1.3f__%d  ",Q[QPos(ind,pop)],box); */
         if (box == NUMBOXES) {
             box = NUMBOXES - 1;    /*ie, Q = 1.000 */
         }
@@ -1753,14 +1779,15 @@ __kernel void DataCollectInd(
         __global int *AncestDist
         )
 {
+    /* printf("Kernel: dataci\n"); */
     int pop = get_global_id(0);
     while(pop < MAXPOPS){
         int ind = get_global_id(1);
         while (ind < NUMINDS){
             UpdateSumsInd(Q,QSum,AncestDist,pop,ind);
-            ind += get_global_size(1);
+            ind +=  get_global_size(1);// > 1 ? get_global_size(1) : 1;
         }
-        pop += get_global_size(0);
+        pop +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
     }
 }
 
@@ -1794,14 +1821,15 @@ __kernel void DataCollectLoc(
         __global float *SumEpsilon
         ) 
 {
+    /* printf("Kernel: datacl\n"); */
     int pop = get_global_id(0);
     while (pop < MAXPOPS) {
         int loc = get_global_id(1);
         while (loc < NUMLOCI){
             UpdateSumsLoc(NumAlleles,P,PSum,Epsilon,SumEpsilon,pop,loc);
-            loc += get_global_size(1);
+            loc +=  get_global_size(1);// > 1 ? get_global_size(1) : 1;
         }
-        pop += get_global_size(0);
+        pop +=  get_global_size(0);// > 1 ? get_global_size(0) : 1;
     }
 }
 
@@ -1811,6 +1839,8 @@ __kernel void ComputeProbFinish(
         __global float *sumsqlikes
         )
 {
+
+    /* printf("Kernel: computeprobfin\n"); */
     float like = loglike[0];
     sumlikes[0] += like;
     sumsqlikes[0] += like*like;

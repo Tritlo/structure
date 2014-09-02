@@ -169,7 +169,7 @@ void initRandGens(CLDict *clDict, unsigned int *randgens){
 }
 
 void breakP(CLDict *clDict){
-    clReleaseEvent(NULL);
+    /* clReleaseEvent(NULL); */
 }
 
 /*=============MAIN======================================*/
