@@ -3,7 +3,7 @@
 #define VERSION "2.3.4 (Jul 2012)"
 
 /*Mechanics of the program, should not need to be changed. */
-#define UNDERFLO   1e-100 /*DBL_MIN*1.1*/   /*Get worried about numbers that are smaller than this */
+#define UNDERFLO   1e-40 /*DBL_MIN*1.1*/   /*Get worried about numbers that are smaller than this */
 #define STOREFREQ  1        /*frequency of recording the likelihood */
 #define UNASSIGNED -9       /*missing Data are placed in this population. Should be <0 */
 #define STRLEN     200      /* max length of string used to store data file name */
@@ -85,30 +85,30 @@ int MAPDISTANCES, MARKERNAMES, LINKAGE, PHASED,PHASEINFO,MARKOVPHASE;
 /*Output Options */
 int UPDATEFREQ, PRINTLIKES, INTERMEDSAVE, PRINTKLD, PRINTNET, PRINTLAMBDA;
 int ECHODATA, ANCESTDIST, NUMBOXES, GENSBACK;
-double ANCESTPINT;
+float ANCESTPINT;
 int PRINTQHAT;
 int PRINTQSUM;
 /*Priors */
 int FREQSCORR, UNIFPRIORALPHA, ONEFST;
-double MIGRPRIOR, ALPHA, FPRIORMEAN,FPRIORSD, LAMBDA, MIGRPRIOR;
-double ALPHAMAX, ALPHAPRIORA, ALPHAPRIORB;
+float MIGRPRIOR, ALPHA, FPRIORMEAN,FPRIORSD, LAMBDA, MIGRPRIOR;
+float ALPHAMAX, ALPHAPRIORA, ALPHAPRIORB;
 /*Miscellaneous */
 int STARTATPOPINFO;
-double ALPHAPROPSD, LOG10RPROPSD,LOG10RMIN,LOG10RMAX,LOG10RSTART;
+float ALPHAPROPSD, LOG10RPROPSD,LOG10RMIN,LOG10RMAX,LOG10RSTART;
 
 /*Relatively obscure options */
 int RANDOMIZE, METROFREQ, REPORTHITRATE, STARTATPOPINFO;
 
 /*Parameters defined in STRATparams */
 int NUMSIMSTATS, NUMPHENS, POOLFREQ, LOCUSxONLY, MISSINGPHENO, PHENOTYPECOL;
-double EMERROR;
+float EMERROR;
 
 /*LocPrior parameters (melissa added 7/12/07)*/
 int LOCPRIOR, NUMLOCATIONS;
 int UPDATELOCPRIOR;
-double LOCPRIORINIT, MAXLOCPRIOR;
+float LOCPRIORINIT, MAXLOCPRIOR;
 int LOCDATA, LOCISPOP;
-double LOCPRIORSTEP;
+float LOCPRIORSTEP;
 int PRINTLOCPRIOR;
 
 /* seed parameter, melissa added 1/8/08 */

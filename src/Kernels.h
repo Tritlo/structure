@@ -9,7 +9,7 @@ extern void printCLErr(cl_int err);
 extern void PrintKernelError(int error);
 extern void handleCLErr(cl_int err,CLDict *clDict,char * message);
 extern void createCLBuffers(CLDict *clDict);
-extern void copyToLocal( double * globalArr, double *localArr,
+extern void copyToLocal( float * globalArr, float *localArr,
                          int * dims, int * dimMaxs, int numDims);
 extern int dimLoc(int * dims, int * dimMaxs, int numDims);
 extern void readBuffer(CLDict *clDict, void * dest, size_t size,
@@ -26,6 +26,7 @@ extern void setKernelArgExplicit(CLDict *clDict, enum KERNEL kernel,size_t size,
 extern void setKernelArg(CLDict *clDict, enum KERNEL kernel, enum BUFFER buffer,int argnum);
 
 extern void finishCommands(CLDict *clDict, char * name);
+extern void finishWaitList(CLDict *clDict);
 
 #endif
 

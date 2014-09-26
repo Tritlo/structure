@@ -1,22 +1,40 @@
-#include "mwc64x.cl"
+/* #include "mwc64x.cl" */
 #include "randGen.cl"
 #define RAND_MAX 4294967296.0f
 
+inline void AtomicInc(__global int *source){
+    atomic_add(source,1);
+}
+
+inline void AtomicAdd(volatile __global float *source, const float operand) {
+    union {
+        unsigned int intVal;
+        float floatVal;
+    } newVal;
+    union {
+        unsigned int intVal;
+        float floatVal;
+    } prevVal;
+    do {
+        prevVal.floatVal = *source;
+        newVal.floatVal = prevVal.floatVal + operand;
+    } while (atomic_cmpxchg((volatile __global unsigned int *)source, prevVal.intVal, newVal.intVal) != prevVal.intVal);
+}
 /*
  * returns a random real in the [lower,upper)
  */
-float randomReal(float lower, float upper,mwc64x_state_t *randState)
+float randomReal(float lower, float upper,RndDiscState *randState)
 {
     uint randVal;
     float randPercent;
     float random;
 
-    randVal = MWC64X_NextUint(randState);
+    randVal = getRandUint(randState);
     randPercent = (float) randVal/(RAND_MAX +1);
     return (lower + randPercent*(upper-lower));
 }
 
-double numToRange(double low, double high, double num)
+float numToRange(float low, float high, float num)
 {
     /* Takes a number in [0,1) -> [low,high) */
     return (low + num * (high - low) );
@@ -38,7 +56,7 @@ int dimLoc(int * dims, int * dimMaxs, int numDims)
 /*
  * Copies the entire last dimension over into localarr
  */
-void copyToLocal( __global double * globalArr, double *localArr,
+void copyToLocal( __global float * globalArr, float *localArr,
                   int * dims, int * dimMaxs, int numDims)
 {
     int i;
@@ -58,12 +76,12 @@ void copyToLocal( __global double * globalArr, double *localArr,
  *  are "total" possible options, and sum is the sum of the
  *  probabilities.  This comes up in the Gibbs sampler context.
  */
-int PickAnOptionDiscrete(int total, double sum, double Probs [],
+int PickAnOptionDiscrete(int total, float sum, float Probs [],
                          RndDiscState *randState)
 {
     int option;
-    double random;
-    double sumsofar =  0.0;
+    float random;
+    float sumsofar =  0.0f;
 
     random = numToRange(0,sum, rndDisc(randState));
     for (option=0; option < total; ++option) {
@@ -75,21 +93,24 @@ int PickAnOptionDiscrete(int total, double sum, double Probs [],
     return option;
 }
 
-int RandomInteger(int low, int high,RndDiscState *randState)
-{
-    int range = high-low;
-    uint random = rndUInt(randState) % range;
-    return (int) random + low;
-}
-
 /* int RandomInteger(int low, int high,RndDiscState *randState) */
 /* { */
-/*     int k; */
-/*     double d = rndDisc(randState); */
-
-/*     k = (int) (d * (high - low + 1)); */
-/*     return (low + k); */
+/*     if (high == low){ */
+/*         return low; */
+/*     } */
+/*     int range = high-low; */
+/*     uint random = rndUInt(randState) % range; */
+/*     return (int) random + low; */
 /* } */
+
+int RandomInteger(int low, int high,RndDiscState *randState)
+{
+    int k;
+    float d = rndDisc(randState);
+
+    k = (int) (d * (high - low + 1));
+    return (low + k);
+}
 
 
 int AlphaPos(int loc, int pop)
@@ -102,11 +123,11 @@ int AlphaPos(int loc, int pop)
 }
 
 /* Returns gamma(f,1), where 0 < f < 1 */
-double RGammaDiscFloat(double n,RndDiscState *randState){
-    double x=0.0;
-    double E=2.71828182;
-    double b=(n+E)/E;
-    double p=0.0;
+float RGammaDiscFloat(float n,RndDiscState *randState){
+    float x=0.0f;
+    float E=2.71828182f;
+    float b=(n+E)/E;
+    float p=0.0f;
     while(1){
         p=b*rndDisc(randState);
         if(p>1) {
@@ -127,9 +148,9 @@ double RGammaDiscFloat(double n,RndDiscState *randState){
 }
 
 /* Returns gamma(1,1) */
-double RGammaDiscOne(RndDiscState *randState){
-    double a=0.0;
-    double u,u0,ustar;
+float RGammaDiscOne(RndDiscState *randState){
+    float a=0.0f;
+    float u,u0,ustar;
     u=rndDisc(randState);
     u0=u;
     while (1){
@@ -148,9 +169,9 @@ double RGammaDiscOne(RndDiscState *randState){
 }
 
 /* Returns gamma(n,1) where n is an int */
-double RGammaDiscInt(int n,RndDiscState *randState){
+float RGammaDiscInt(int n,RndDiscState *randState){
     int i =0;
-    double x = 0;
+    float x = 0;
     for(i = 0; i < n; ++i){
         x += log(rndDisc(randState));
     }
@@ -165,18 +186,18 @@ double RGammaDiscInt(int n,RndDiscState *randState){
  *
  *  which can be found online at http://luc.devroye.org/rnbookindex.html
  */
-double RGammaCheng(double a,RndDiscState *randState){
-    double b = a - log(4.0);
-    double c = a + sqrt(2.0*a-1.0);
-    double U,V,X,Y,Z,R;
+float RGammaCheng(float a,RndDiscState *randState){
+    float b = a - log(4.0f);
+    float c = a + sqrt(2.0f*a-1.0f);
+    float U,V,X,Y,Z,R;
     while (1){
         U = rndDisc(randState);
         V = rndDisc(randState);
-        Y = a*log(V/(1.0-V));
+        Y = a*log(V/(1.0f-V));
         X = a*exp(V);
         Z = U*(V*V);
         R = b + c*Y - X;
-        if( (R >= (9.0/2.0)*Z - (1+log(9.0/2.0))) ||   ( R >= log(Z)) ){
+        if( (R >= (9.0f/2.0f)*Z - (1+log(9.0f/2.0f))) ||   ( R >= log(Z)) ){
             break;
         }
     }
@@ -192,15 +213,15 @@ double RGammaCheng(double a,RndDiscState *randState){
  *  which can be found online at http://luc.devroye.org/rnbookindex.html
  */
 
-double RGammaBest(double a,RndDiscState *randState){
-    double b = a -1;
-    double c = 3*a - 0.75;
-    double U,V,W,Y,X,Z;
+float RGammaBest(float a,RndDiscState *randState){
+    float b = a -1;
+    float c = 3*a - 0.75f;
+    float U,V,W,Y,X,Z;
     while (1){
         U = rndDisc(randState);
         V = rndDisc(randState);
         W = U*(1-U);
-        Y = sqrt((c/W))*(U-0.5);
+        Y = sqrt((c/W))*(U-0.5f);
         X = b + Y;
         if( X >= 0){
             Z = 64*(W*W*W)*(V*V);
@@ -212,40 +233,40 @@ double RGammaBest(double a,RndDiscState *randState){
     return X;
 }
 
-double RGammaLargerThanOne(double n, RndDiscState *randState)
+float RGammaLargerThanOne(float n, RndDiscState *randState)
 {
-    double aa,w,x;
-    double nprev=0.0;
-    double c1=0.0;
-    double c2=0.0;
-    double c3=0.0;
-    double c4=0.0;
-    double c5=0.0;
-    double u1;
-    double u2;
+    float aa,w,x;
+    float nprev=0.0f;
+    float c1=0.0f;
+    float c2=0.0f;
+    float c3=0.0f;
+    float c4=0.0f;
+    float c5=0.0f;
+    float u1;
+    float u2;
     /*if(n!=nprev) {*/
-        c1=n-1.0;
-        aa=1.0/c1;
+        c1=n-1.0f;
+        aa=1.0f/c1;
         c2=aa*(n-1/(6*n));
         c3=2*aa;
         c4=c3+2;
-        if(n>2.5) {
+        if(n>2.5f) {
             c5=1/sqrt(n);
         }
     /*}*/
 four:
     u1=rndDisc(randState);
     u2=rndDisc(randState);
-    if(n<=2.5) {
+    if(n<=2.5f) {
         goto five;
     }
-    u1=u2+c5*(1-1.86*u1);
+    u1=u2+c5*(1-1.86f*u1);
     if ((u1<=0) || (u1>=1)) {
         goto four;
     }
 five:
     w=c2*u2/u1;
-    if(c3*u1+w+1.0/w < c4) {
+    if(c3*u1+w+1.0f/w < c4) {
         goto six;
     }
     if(c3*log(u1)-log(w)+w >=1) {
@@ -261,12 +282,12 @@ six:
 /*-----------Gamma and dirichlet from Matt.----------*/
 /* gamma random generator from Ripley, 1987, P230 */
 
-double RGammaDisc(double n,double lambda,RndDiscState *randState)
+float RGammaDisc(float n,float lambda,RndDiscState *randState)
 {
-    double x=0.0;
+    float x=0.0f;
     if(n<1) {
         x = RGammaDiscFloat(n,randState);
-    } else if(n==1.0) {
+    } else if(n==1.0f) {
         /* gamma (1,1) is an exponential dist */
         /*x = RGammaDiscOne(randState);*/
         x = -log(rndDisc(randState));
@@ -279,9 +300,9 @@ double RGammaDisc(double n,double lambda,RndDiscState *randState)
             /*x = RGammaCheng(n,randState);*/
         /*}*/
         /*int wholepart = (int) n;*/
-        /*double xi = 0.0;*/
-        /*double wholegamma = 0.0;*/
-        /*double floatpart = n - wholepart;*/
+        /*float xi = 0.0;*/
+        /*float wholegamma = 0.0;*/
+        /*float floatpart = n - wholepart;*/
         /*xi = RGammaDiscFloat(floatpart,randState);*/
         /*wholegamma = RGammaBest(wholepart,randState);*/
         /*x = xi + wholegamma;*/
@@ -294,18 +315,23 @@ double RGammaDisc(double n,double lambda,RndDiscState *randState)
 
 
 /* Dirichlet random generator
-   a and b are arrays of length k, containing doubles.
+   a and b are arrays of length k, containing floats.
    a is the array of parameters
    b is the output array, where b ~ Dirichlet(a)
    */
 
-void RDirichletDisc(double * a, int k, double * b,RndDiscState *randState)
+void RDirichletDisc(float * a, int k, float * b,RndDiscState *randState)
 {
     int i;
-    double sum=0.0;
+    float sum=0.0f;
+    float c,y,t;
+    c = 0.0f;
     for(i=0; i<k; i++) {
         b[i]=RGammaDisc(a[i],1,randState);
-        sum += b[i];
+        y = b[i] - c;
+        t = sum + y;
+        c = (t - sum) -y;
+        sum = t;
     }
     for(i=0; i<k; i++) {
         b[i] /= sum;
@@ -313,11 +339,11 @@ void RDirichletDisc(double * a, int k, double * b,RndDiscState *randState)
 }
 
 /* Melissa's version, adapted from an algorithm on wikipedia.  January 08 */
-double LogRGammaDisc(double n, double lambda, RndDiscState *randState)
+float LogRGammaDisc(float n, float lambda, RndDiscState *randState)
 {
-    double v0, v[3], E=2.71828182, em, logem, lognm;
+    float v0, v[3], E=2.71828182f, em, logem, lognm;
     int i;
-    if (n >= 1.0) {
+    if (n >= 1.0f) {
         return log(RGammaDisc(n, lambda,randState));
     }
     v0 = E/(E+n);
@@ -327,11 +353,11 @@ double LogRGammaDisc(double n, double lambda, RndDiscState *randState)
         }
 
         if (v[0] <= v0) {
-            logem = 1.0/n*log(v[1]);
+            logem = 1.0f/n*log(v[1]);
             em = exp(logem);
             lognm = log(v[2])+(n-1)*logem;
         } else {
-            em = 1.0-log(v[1]);
+            em = 1.0f-log(v[1]);
             logem = log(em);
             lognm = log(v[2]) - em;
         }
@@ -342,15 +368,20 @@ double LogRGammaDisc(double n, double lambda, RndDiscState *randState)
 }
 
 /*O(k)*/
-void LogRDirichletDisc (double *a, int k,__global double *b,
+void LogRDirichletDisc (float *a, int k,__global float *b,
                         RndDiscState *randState)
 {
     int i;
-    double sum = 0.0;
-    /* double sum2; */
+    float sum = 0.0f;
+    /* float sum2; */
+    float c,y,t;
+    c = 0.0f;
     for (i = 0; i < k; i++) {
         b[i] =RGammaDisc (a[i], 1,randState);
-        sum += b[i];
+        y = b[i] - c;
+        t = sum + y;
+        c = (t - sum) -y;
+        sum = t;
     }
 
     /* patch added May 2007 to set gene frequencies equal if all draws
@@ -358,7 +389,7 @@ void LogRDirichletDisc (double *a, int k,__global double *b,
        Ensures that P and logP remain defined in this rare event */
     /* if(sum<UNDERFLO) { */
     /*     for(i=0; i<k; i++) { */
-    /*         b[i] = 1.0/(double)(k); */
+    /*         b[i] = 1.0/(float)(k); */
     /*     } */
     /* } else { */
         /* sum2=log(sum); */

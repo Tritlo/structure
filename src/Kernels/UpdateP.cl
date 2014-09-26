@@ -8,8 +8,8 @@ __kernel void GetNumFromPops (
 )
 {
     int loc = get_global_id(1);
-    int offset = loc*MAXPOPS*MAXALLELES;
     while (loc < NUMLOCI){
+        int offset = loc*MAXPOPS*MAXALLELES;
         int ind = get_global_id(0);
         int numalleles = NumAlleles[loc];
         int pos,line,popvalue,allelevalue;
@@ -29,7 +29,7 @@ __kernel void GetNumFromPops (
 
                     if ((allelevalue != MISSING) && (popvalue != UNASSIGNED)) {
                         pos = NumAFromPopPos (popvalue, allelevalue) + offset;
-                        atom_inc(&NumAFromPops[pos]);
+                        AtomicInc(&NumAFromPops[pos]);
                     }
 
                 }
@@ -41,31 +41,31 @@ __kernel void GetNumFromPops (
 }
 
 __kernel void UpdateP (
-    __global double* P
+    __global float* P
     , __global int* NumAlleles
     , __global int* NumAFromPops
     , __global uint* randGens
     , __global int* error
     #if FREQSCORR
-    , __global double *Epsilon
-    , __global double *Fst
+    , __global float *Epsilon
+    , __global float *Fst
     #else
-    , __global double* lambda
+    , __global float* lambda
     #endif
 )
 {
     int loc = get_global_id(0);
-    int numalleles = NumAlleles[loc];
-    double Parameters[MAXALLELES];
+    float Parameters[MAXALLELES];
     RndDiscState randState[1];
-    double param;
+    float param;
     int allele;
 
     while (loc < NUMLOCI){
+        int numalleles = NumAlleles[loc];
+        int offset = loc*MAXPOPS*MAXALLELES;
         int pop = get_global_id(1);
         while (pop < MAXPOPS) {
-            int offset = loc*MAXPOPS*MAXALLELES;
-            int pos,line,popvalue,allelevalue;
+            /* int pos,line,popvalue,allelevalue; */
             initRndDiscState(randState,randGens,loc*MAXPOPS +pop);
 
             for (allele = 0; allele < numalleles; allele++) {
@@ -73,7 +73,7 @@ __kernel void UpdateP (
                                      allele)+offset];
                 #if FREQSCORR
                     param = Epsilon[EpsPos (loc, allele)]
-                                     *(1.0- Fst[pop])/Fst[pop];
+                                     *(1.0f- Fst[pop])/Fst[pop];
                 #else
                     param = lambda[pop];
                 #endif

@@ -1,4 +1,4 @@
-double AlphaPriorDiff (double newalpha, double oldalpha)
+float AlphaPriorDiff (float newalpha, float oldalpha)
 {
     /*returns log diff in priors for the alpha, assuming a gamma prior on alpha
       See notes 7/29/99 */
@@ -8,56 +8,63 @@ double AlphaPriorDiff (double newalpha, double oldalpha)
 
 
 __kernel void UpdateAlpha(
-       __global double *Q,
-       __global double *Alpha,
+       __global float *Q,
+       __global float *Alpha,
        __global int *popflags,
-       __global double *norms,
-       __global double *results,
+       __global float *norms,
+       __global float *results,
        __global uint *randGens,
-       __local double *scratch,
+       __local float *scratch,
        const int POPFLAGINDS)
 {
     int alpha = get_global_id(1);
+    float c, y, t; // KahanSum
     while( alpha < NUMALPHAS){
         int ind = get_global_id(0);
         if(ind < NUMINDS){
             int redpop;
             int numredpops = MAXPOPS;
 
-            double newalpha = norms[alpha];
-            double oldalpha = Alpha[alpha];
-            double alphasum =0.0;
+            float newalpha = norms[alpha];
+            float oldalpha = Alpha[alpha];
+            float alphasum =0.0f;
 
             if ((newalpha > 0) && ((newalpha < ALPHAMAX) || (!(UNIFPRIORALPHA)) ) ) {
                 if (POPALPHAS){ numredpops = alpha +1; }
                 //TODO: Evaluate underflow safe vs nonsafe
-                double sum = 1.0;
-                double total = 0.0;
+                float sum = 1.0f;
+                float total = 0.0f;
+                c = 0.0f;
                 while( ind < NUMINDS){
                     if (!((USEPOPINFO) && (popflags[ind]))) {
                         //Safe version (similar to in code)
                         //Watching out for underflow
-                        /* double elem = 1.0; */
-                        /* for(redpop = alpha; redpop < numredpops; redpop++){ */
-                        /*     elem *= Q[QPos (ind, redpop)]; */
-                        /* } */
-
-                        /* if (elem > SQUNDERFLO){ */
-                        /*     sum *= elem; */
-                        /* } else { */
-                        /*     sum *= SQUNDERFLO; */
-                        /* } */
-                        /* if(sum < SQUNDERFLO){ */
-                        /*     total += log(sum); */
-                        /*     sum = 1.0; */
-                        /* } */
-                        //Might underflow?
-                        double elem = 0.0;
+                        float elem = 1.0f;
                         for(redpop = alpha; redpop < numredpops; redpop++){
-                            elem += log(Q[QPos (ind, redpop)]);
+                            elem *= Q[QPos (ind, redpop)];
                         }
 
-                        total += elem;
+                        if (elem > SQUNDERFLO){
+                            sum *= elem;
+                        } else {
+                            sum *= SQUNDERFLO;
+                        }
+                        if(sum < SQUNDERFLO){
+                            y = log(sum)- c;
+                            t = total + y;
+                            c = (t-total) - y;
+                            total = t;
+                            sum = 1.0f;
+                        }
+                        //Might underflow?
+                        /* float elem = 0.0f; */
+                        /* for(redpop = alpha; redpop < numredpops; redpop++){ */
+                        /*     elem += log(Q[QPos (ind, redpop)]); */
+                        /* } */
+                        /* y = elem - c; */
+                        /* t = total + y; */
+                        /* c = (t-total) - y; */
+                        /* total = t; */
 
                         ind += get_global_size(0);
                     }
@@ -70,13 +77,20 @@ __kernel void UpdateAlpha(
                 scratch[localId] = total;
                 barrier(CLK_LOCAL_MEM_FENCE);
                 int devs = get_local_size(0);
+                c = 0.0f;
                 for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
                     if(localId < offset){
-                        scratch[localId] += scratch[localId + offset];
+                        y = scratch[localId + offset] - c;
+                        t = scratch[localId] + y;
+                        c = (t-scratch[localId]) - y;
+                        scratch[localId] = t;
                     }
                     //Handle if were not working on a multiple of 2
                     if (localId == 0 && (devs-1)/2 == offset){
-                        scratch[localId] += scratch[devs-1];
+                        y = scratch[devs-1] - c;
+                        t = scratch[localId] + y;
+                        c = (t-scratch[localId]) - y;
+                        scratch[localId] = t;
                     }
 
                     devs >>= 1;
@@ -99,8 +113,8 @@ __kernel void UpdateAlpha(
                     for (int i=0; i<MAXPOPS; i++)  {
                         alphasum += Alpha[i];
                     }
-                    double logprobdiff = 0.0;
-                    double logterm = 0.0;
+                    float logprobdiff = 0.0f;
+                    float logterm = 0.0f;
                     if (!(UNIFPRIORALPHA)) logprobdiff = AlphaPriorDiff (newalpha, oldalpha);
 
                     for(int id =0; id < numgroups; id++){
@@ -109,20 +123,21 @@ __kernel void UpdateAlpha(
                     }
 
                     int multiple = numredpops - alpha;
-                    double lpsum = 0.0;
-                    lpsum -= (oldalpha - 1.0) * logterm;
-                    lpsum += (newalpha - 1.0) * logterm;
+                    float lpsum = (newalpha - oldalpha) * logterm;
+                    /*lpsum -= (oldalpha - 1.0f) * logterm;
+                      lpsum += (newalpha - 1.0f) * logterm;*/
 
-                    double sumalphas = alphasum;
-                    lpsum -= (lgamma (alphasum) - multiple * lgamma ( oldalpha)) * POPFLAGINDS;
-
+                    float sumalphas = alphasum;
                     if (POPALPHAS){
                         sumalphas += newalpha - oldalpha;
                     } else {
                         sumalphas = MAXPOPS*newalpha;
                     }
 
-                    lpsum += (lgamma (sumalphas) - multiple * lgamma ( newalpha)) * POPFLAGINDS;
+                    lpsum += ((lgamma(sumalphas) - lgamma(alphasum)) - multiple*(lgamma(newalpha) - lgamma(oldalpha))) * POPFLAGINDS;
+                    
+                    /*lpsum -= (lgamma (alphasum) - multiple * lgamma ( oldalpha)) * POPFLAGINDS;
+                      lpsum += (lgamma (sumalphas) - multiple * lgamma ( newalpha)) * POPFLAGINDS;*/
                     logprobdiff += lpsum;
 
                     if (rndDisc(randState) < exp(logprobdiff)) {   /*accept new f */

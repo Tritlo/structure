@@ -1,12 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef __APPLE__
+#include <OpenCL/cl.h>
+#else
 #include <CL/cl.h>
+#endif
+
 #include "KernelDefs.h"
 #include "structure.h"
 
 #define MAX_SOURCE_SIZE (0x100000)
-#define USEGPU 1
 
 
 void printCLErr(cl_int err)
@@ -183,6 +188,7 @@ void ReleaseCLDict(CLDict *clDict)
     }
     free(clDict->buffers);
     free(clDict->locals);
+    free(clDict->event_wait_list);
     clReleaseCommandQueue(clDict->commands);
     clReleaseContext(clDict->context);
     free(clDict);
@@ -269,7 +275,7 @@ void setKernelArgs(CLDict *clDict)
     setKernelArg(clDict,mapReduceLogDiffsKernel,GENOCL,3);
     setKernelArg(clDict,mapReduceLogDiffsKernel,LOGDIFFSCL,4);
     setKernelArg(clDict,mapReduceLogDiffsKernel,REDUCERESULTSCL,5);
-    setKernelArgExplicit(clDict,mapReduceLogDiffsKernel,sizeof(double)*NUMLOCI,NULL,6);
+    setKernelArgExplicit(clDict,mapReduceLogDiffsKernel,sizeof(float)*NUMLOCI,NULL,6);
 
     /* RDirichlet sample */
     setKernelArg(clDict,RDirichletSampleKernel,ALPHACL,0);
@@ -296,8 +302,8 @@ void setKernelArgs(CLDict *clDict)
     setKernelArg(clDict,UpdQDirichletKernel,POPFLAGCL,4);
 
     /* FillArrayWithRandom dirichlet */
-    setKernelArg(clDict,FillArrayWRandomKernel,RANDCL,0);
-    setKernelArg(clDict,FillArrayWRandomKernel,RANDGENSCL,1);
+    /* setKernelArg(clDict,FillArrayWRandomKernel,RANDCL,0); */
+    /* setKernelArg(clDict,FillArrayWRandomKernel,RANDGENSCL,1); */
 
     /*Init rand gens */
     setKernelArg(clDict,InitRandGenKernel,RANDGENSCL,0);
@@ -310,7 +316,7 @@ void setKernelArgs(CLDict *clDict)
     setKernelArg(clDict,UpdateFstKernel,NORMSCL,4);
     setKernelArg(clDict,UpdateFstKernel,RANDGENSCL,5);
     setKernelArg(clDict,UpdateFstKernel,REDUCERESULTSCL,6);
-    setKernelArgExplicit(clDict,UpdateFstKernel,sizeof(double)*NUMLOCI,NULL,7);
+    setKernelArgExplicit(clDict,UpdateFstKernel,sizeof(float)*NUMLOCI,NULL,7);
 
     /* gpu normals */
     setKernelArg(clDict,PopNormals,NORMSCL,1);
@@ -323,7 +329,7 @@ void setKernelArgs(CLDict *clDict)
     setKernelArg(clDict,UpdateAlphaKernel,NORMSCL,3);
     setKernelArg(clDict,UpdateAlphaKernel,REDUCERESULTSCL,4);
     setKernelArg(clDict,UpdateAlphaKernel,RANDGENSCL,5);
-    setKernelArgExplicit(clDict,UpdateAlphaKernel,sizeof(double)*NUMINDS,NULL,6);
+    setKernelArgExplicit(clDict,UpdateAlphaKernel,sizeof(float)*NUMINDS,NULL,6);
     /* Arg 7 set when calculated in structure.c */
 
     setKernelArg(clDict,NonIndUpdateEpsilonKernel,PCL,0);
@@ -361,7 +367,7 @@ void setKernelArgs(CLDict *clDict)
     setKernelArg(clDict,MapReduceLogLikeKernel,GENOCL,2);
     setKernelArg(clDict,MapReduceLogLikeKernel,LOGLIKESCL,3);
     setKernelArg(clDict,MapReduceLogLikeKernel,REDUCERESULTSCL,4);
-    setKernelArgExplicit(clDict,MapReduceLogLikeKernel,sizeof(double)*NUMLOCI,NULL,5);
+    setKernelArgExplicit(clDict,MapReduceLogLikeKernel,sizeof(float)*NUMLOCI,NULL,5);
 
     setKernelArg(clDict,CalcLikeKernel,LOGLIKESCL,0);
     setKernelArg(clDict,CalcLikeKernel,INDLIKECL,1);
@@ -370,7 +376,7 @@ void setKernelArgs(CLDict *clDict)
     setKernelArgExplicit(clDict,CalcLikeKernel,sizeof(int),&flag,3);
     setKernelArg(clDict,CalcLikeKernel,LIKECL,4);
     setKernelArg(clDict,CalcLikeKernel,REDUCERESULTSCL,5);
-    setKernelArgExplicit(clDict,CalcLikeKernel,sizeof(double)*NUMINDS,NULL,6);
+    setKernelArgExplicit(clDict,CalcLikeKernel,sizeof(float)*NUMINDS,NULL,6);
 
 }
 
@@ -497,7 +503,8 @@ int CompileKernels(CLDict *clDict,  char *options)
         ,"DataCollectInd","DataCollectLoc","CalcLike","ComputeProbFinish","mapReduceLogLike"};
 
     /* Load the source code containing the kernels*/
-    fp = fopen("Kernels/Kernels.cl", "r");
+    /* fp = fopen("Kernels/Kernels.cl", "r"); */
+    fp = fopen("Kernels/OneKernels.cl", "r");
     if (!fp) {
         fprintf(stderr, "Failed to load kernel file Kernels.cl\n");
         return EXIT_FAILURE;
@@ -562,75 +569,147 @@ int CompileKernels(CLDict *clDict,  char *options)
     return EXIT_SUCCESS;
 }
 
-void createCLBuffer(CLDict *clDict, enum BUFFER buffer, size_t size, cl_mem_flags type){
+void finishCommands(CLDict *clDict, char * name)
+{
     cl_int err;
+    char fmsg[120];
+    err = clFinish(clDict->commands);
+    strcpy(fmsg,"clFinish error: ");
+    strcat(fmsg,name);
+    strcat(fmsg,"!\n");
+    handleCLErr(err, clDict,fmsg);
+}
+
+void addToWaitList(CLDict *clDict,cl_event event){
+    /* clReleaseEvent(event); */
+    /* clDict->event_wait_list[(clDict->num_events_in_waitlist)++] = event; */
+}
+void finishWaitList(CLDict *clDict){
+    /* int i = 0; */
+    finishCommands(clDict,"finishing command list");
+    /* for(i = 0; i < clDict->num_events_in_waitlist; ++i) */
+    /* { */
+    /*     clReleaseEvent(clDict->event_wait_list[i]); */
+    /* } */
+
+    clDict->num_events_in_waitlist=0;
+}
+
+void writeBuffer(CLDict *clDict, void * source, size_t size,
+                 enum BUFFER dest, char *name)
+{
+    cl_int err;
+    char msg[120];
+
+    /* apparently a blocking enqueue already does this */
+    /*strcpy(msg,"Prewrite finish error: ");*/
+    /*strcat(msg,name);*/
+    /*strcat(msg,"!\n");*/
+    /*finishCommands(clDict,msg);*/
+    cl_event event;
+    err = clEnqueueWriteBuffer(clDict->commands, clDict->buffers[dest], CL_FALSE,
+                               0,
+                               size,source,
+                               clDict->num_events_in_waitlist, clDict->event_wait_list, NULL );
+    addToWaitList(clDict,event);
+    strcpy(msg,"Failed to write buffer: ");
+    strcat(msg,name);
+    strcat(msg,"!\n");
+    handleCLErr(err, clDict,msg);
+    /*err = clFinish(clDict->commands);*/
+    /*handleCLErr(err, clDict,"clFinish error!\n");*/
+}
+
+void createCLBuffer(CLDict *clDict, enum BUFFER buffer, size_t size,int length, cl_mem_flags type){
+    cl_int err;
+    void * emptybuffer;
     clDict->buffers[buffer] = clCreateBuffer(clDict->context,  type,
-                                          size,NULL, &err);
+
+                                          size*length,NULL, &err);
+    
     handleCLErr(err, clDict,"Error: Failed create buffer!");
+    emptybuffer = calloc(length,size);
+    writeBuffer(clDict,emptybuffer,size*length,buffer,"empty buffer");
+    free(emptybuffer);
 }
 
 void createCLBuffers(CLDict *clDict)
 {
-    createCLBuffer(clDict,QCL,sizeof(double)*QSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,QSUMCL,sizeof(double)*QSIZE,CL_MEM_WRITE_ONLY);
-    createCLBuffer(clDict,PCL,sizeof(double)*PSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,PSUMCL,sizeof(double)*PSIZE,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,QCL,sizeof(float),QSIZE,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,QSUMCL,sizeof(float),QSIZE,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,PCL,sizeof(float),PSIZE,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,PSUMCL,sizeof(float),PSIZE,CL_MEM_WRITE_ONLY);
 
     if (FREQSCORR) {
-        createCLBuffer(clDict,FSTCL,sizeof(double)*MAXPOPS,CL_MEM_READ_WRITE);
-        createCLBuffer(clDict,FSTSUMCL,sizeof(double)*MAXPOPS,CL_MEM_WRITE_ONLY);
-        createCLBuffer(clDict,NORMSCL,sizeof(double)*MAXPOPS,CL_MEM_READ_WRITE);
-        createCLBuffer(clDict,EPSILONCL,sizeof(double)*NUMLOCI*MAXALLELES,CL_MEM_READ_WRITE);
-        createCLBuffer(clDict,EPSILONSUMCL,sizeof(double)*NUMLOCI*MAXALLELES,CL_MEM_WRITE_ONLY);
+        createCLBuffer(clDict,FSTCL,sizeof(float),MAXPOPS,CL_MEM_READ_WRITE);
+        createCLBuffer(clDict,FSTSUMCL,sizeof(float),MAXPOPS,CL_MEM_WRITE_ONLY);
+        createCLBuffer(clDict,NORMSCL,sizeof(float),MAXPOPS,CL_MEM_READ_WRITE);
+        createCLBuffer(clDict,EPSILONCL,sizeof(float),NUMLOCI*MAXALLELES,CL_MEM_READ_WRITE);
+        createCLBuffer(clDict,EPSILONSUMCL,sizeof(float),NUMLOCI*MAXALLELES,CL_MEM_WRITE_ONLY);
     }
 
-    createCLBuffer(clDict,LAMBDACL,sizeof(double)*MAXPOPS,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,LAMBDASUMCL,sizeof(double)*MAXPOPS,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,LAMBDACL,sizeof(float),MAXPOPS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,LAMBDASUMCL,sizeof(float),MAXPOPS,CL_MEM_WRITE_ONLY);
 
-    createCLBuffer(clDict,ZCL,sizeof(int)*ZSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,GENOCL,sizeof(int)*GENOSIZE,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,ZCL,sizeof(int),ZSIZE,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,GENOCL,sizeof(int),GENOSIZE,CL_MEM_READ_WRITE);
 
 
     if (RECESSIVEALLELES) {
-        createCLBuffer(clDict,PREGENOCL,sizeof(int)*GENOSIZE,CL_MEM_READ_WRITE);
-        createCLBuffer(clDict,RECESSIVECL,sizeof(int)*NUMLOCI,CL_MEM_READ_WRITE);
+        createCLBuffer(clDict,PREGENOCL,sizeof(int),GENOSIZE,CL_MEM_READ_WRITE);
+        createCLBuffer(clDict,RECESSIVECL,sizeof(int),NUMLOCI,CL_MEM_READ_WRITE);
 
     }
-    createCLBuffer(clDict,NUMALLELESCL,sizeof(int)*NUMLOCI,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,NUMALLELESCL,sizeof(int),NUMLOCI,CL_MEM_READ_WRITE);
 
     /*if (PFROMPOPFLAGONLY || USEPOPINFO) {*/
     /*}*/
-    createCLBuffer(clDict,POPFLAGCL,sizeof(int)*NUMINDS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,POPFLAGCL,sizeof(int),NUMINDS,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,NUMAFROMPOPSCL,sizeof(int)*NUMLOCI*MAXPOPS*MAXALLELES,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,NUMAFROMPOPSCL,sizeof(int),NUMLOCI*MAXPOPS*MAXALLELES,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,NUMLOCIPOPSCL,sizeof(int)*NUMINDS*MAXPOPS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,NUMLOCIPOPSCL,sizeof(int),NUMINDS*MAXPOPS,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,LOGDIFFSCL,sizeof(double)*NUMINDS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,LOGDIFFSCL,sizeof(float),NUMINDS,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,REDUCERESULTSCL,sizeof(double)*MAXGROUPS*NUMINDS*NUMLOCI,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,REDUCERESULTSCL,sizeof(float),MAXGROUPS*NUMINDS*NUMLOCI,CL_MEM_READ_WRITE);
 
-    /*createCLBuffer(clDict,LOGTERMSCL,sizeof(double)*NUMINDS*NUMLOCI,CL_MEM_READ_WRITE);*/
-    createCLBuffer(clDict,ALPHACL,sizeof(double)*MAXPOPS,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,ALPHASUMCL,sizeof(double)*MAXPOPS,CL_MEM_WRITE_ONLY);
+    /*createCLBuffer(clDict,LOGTERMSCL,sizeof(float)*NUMINDS*NUMLOCI,CL_MEM_READ_WRITE);*/
+    createCLBuffer(clDict,ALPHACL,sizeof(float),MAXPOPS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,ALPHASUMCL,sizeof(float),MAXPOPS,CL_MEM_WRITE_ONLY);
 
-    createCLBuffer(clDict,TESTQCL,sizeof(double)*QSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,RANDCL,sizeof(double)*RANDSIZE,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,RANDGENSCL,sizeof(unsigned int)*NUMRANDGENS*2,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,ERRORCL,sizeof(int)*2,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,TESTQCL,sizeof(float),QSIZE,CL_MEM_READ_WRITE);
+    /* createCLBuffer(clDict,RANDCL,sizeof(float),RANDSIZE,CL_MEM_READ_WRITE); */
 
-    createCLBuffer(clDict,LOGLIKESCL,sizeof(double)*NUMINDS,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,INDLIKECL,sizeof(double)*NUMINDS,CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,SUMINDLIKECL,sizeof(double)*NUMINDS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,RANDGENSCL,sizeof(unsigned int),NUMRANDGENS,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,LIKECL,sizeof(double),CL_MEM_READ_WRITE);
-    createCLBuffer(clDict,SUMLIKESCL,sizeof(double),CL_MEM_WRITE_ONLY);
-    createCLBuffer(clDict,SUMSQLIKESCL,sizeof(double),CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,ERRORCL,sizeof(int),2,CL_MEM_READ_WRITE);
 
-    createCLBuffer(clDict,ANCESTDISTCL,sizeof(int)*NUMINDS*MAXPOPS*NUMBOXES,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,LOGLIKESCL,sizeof(float),NUMINDS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,INDLIKECL,sizeof(float),NUMINDS,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,SUMINDLIKECL,sizeof(float),NUMINDS,CL_MEM_READ_WRITE);
+
+    createCLBuffer(clDict,LIKECL,sizeof(float),1,CL_MEM_READ_WRITE);
+    createCLBuffer(clDict,SUMLIKESCL,sizeof(float),1,CL_MEM_WRITE_ONLY);
+    createCLBuffer(clDict,SUMSQLIKESCL,sizeof(float),1,CL_MEM_WRITE_ONLY);
+    
+    if (ANCESTDIST){
+        createCLBuffer(clDict,ANCESTDISTCL,sizeof(int),NUMINDS*MAXPOPS*NUMBOXES,CL_MEM_WRITE_ONLY);
+    }
+    else {
+        createCLBuffer(clDict,ANCESTDISTCL,sizeof(int),1,CL_MEM_WRITE_ONLY);
+    }
 }
 
 
+static struct { cl_platform_info param; const char *name; } props[] = {
+  { CL_PLATFORM_PROFILE, "profile" },
+  { CL_PLATFORM_VERSION, "version" },
+  { CL_PLATFORM_NAME, "name" },
+  { CL_PLATFORM_VENDOR, "vendor" },
+  { CL_PLATFORM_EXTENSIONS, "extensions" },
+  { 0, NULL },
+};
 /*
  * Inits the dict, but the program must still be compiled.
  */
@@ -639,45 +718,73 @@ int InitCLDict(CLDict *clDictToInit)
     cl_kernel *kernels;
     cl_mem *buffers;
     size_t *locals;
-    cl_platform_id platform_id;
+    cl_platform_id *platform_id;
     cl_uint ret_num_devices;
     cl_uint ret_num_platforms;
     cl_int ret;
     cl_context context;
     cl_device_id device_id;
     cl_command_queue commands;
+    cl_event *event_wait_list;
+    cl_platform_id platform;
     int err;
+    int i;
+    int ii;
+    char buf[65536];
+    size_t size;
+    cl_int status;
+    int foundDevice = 0;
     int compileret;
     char options[1024];
     int numalphas = POPALPHAS ? MAXPOPS : 1;
     int DEVICETYPE =  USEGPU ? CL_DEVICE_TYPE_GPU : CL_DEVICE_TYPE_CPU;
-
-    ret = clGetPlatformIDs(1, &platform_id, &ret_num_platforms);
-    err = clGetDeviceIDs(platform_id, DEVICETYPE, 1, &device_id, &ret_num_devices);
-    if (err != CL_SUCCESS) {
-        printf("retval %d\n",(int) ret);
-        switch(err) {
-        case CL_INVALID_PLATFORM:
-            printf("invalid platform!");
-            break;
-        case CL_INVALID_VALUE:
-            printf("invalid value");
-            break;
-        case CL_DEVICE_NOT_FOUND:
-            printf("device not found");
-            break;
-        case CL_INVALID_DEVICE_TYPE:
-            if(USEGPU) {
-                printf("invalid device: GPU\n");
-            } else {
-                printf("invalid device: CPU\n");
+    ret = clGetPlatformIDs(0, NULL, &ret_num_platforms);
+    platform_id = calloc(ret_num_platforms,sizeof(cl_platform_id));
+    ret = clGetPlatformIDs(ret_num_platforms, platform_id, &ret_num_platforms);
+    /* try all available platforms */
+    for( i = 0; i < ret_num_platforms; i++){
+        printf("Trying platform %d\n",i);
+        platform = platform_id[i];
+       for (ii = 0; props[ii].name != NULL; ii++) {
+          status = clGetPlatformInfo(platform, props[ii].param, sizeof buf, buf, &size);
+          if (status != CL_SUCCESS) {
+             continue;
+          }
+          printf("platform[%p]: %s: %s\n", platform, props[ii].name, buf);
+       }
+        err = clGetDeviceIDs(platform_id[i], DEVICETYPE, 1, &device_id, &ret_num_devices);
+        if (err != CL_SUCCESS) {
+            switch(err) {
+            case CL_INVALID_PLATFORM:
+                printf("invalid platform!");
+                break;
+            case CL_INVALID_VALUE:
+                printf("invalid value");
+                break;
+            case CL_DEVICE_NOT_FOUND:
+                printf("device not found");
+                break;
+            case CL_INVALID_DEVICE_TYPE:
+                if(USEGPU) {
+                    printf("invalid device: GPU\n");
+                } else {
+                    printf("invalid device: CPU\n");
+                }
+                break;
             }
+        } else {
+            printf("Creating device group!\n");
+            foundDevice = 1;
             break;
         }
+    }
+
+    if (!foundDevice){
         printf("Error: Failed to create a device group!\n");
         return EXIT_FAILURE;
     }
 
+    free(platform_id);
     context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
     if (!context) {
         printf("Error: Failed to create a compute context!\n");
@@ -695,6 +802,8 @@ int InitCLDict(CLDict *clDictToInit)
     kernels = calloc(NumberOfKernels, sizeof(cl_kernel));
     buffers = calloc(NumberOfBuffers, sizeof(cl_mem));
     locals = calloc(NumberOfKernels, sizeof(size_t));
+    /* event_wait_list = calloc(255,sizeof(cl_event)); */
+    event_wait_list = NULL;
     clDictToInit->kernels = kernels;
     clDictToInit->buffers = buffers;
     clDictToInit->locals = locals;
@@ -704,6 +813,8 @@ int InitCLDict(CLDict *clDictToInit)
     clDictToInit->device_id = device_id;
     clDictToInit->context = context;
     clDictToInit->commands = commands;
+    clDictToInit->event_wait_list = event_wait_list;
+    clDictToInit->num_events_in_waitlist = 0;
 
     /* compile OpenCL kernels */
     /*Define the constants in the kernels */
@@ -715,13 +826,9 @@ int InitCLDict(CLDict *clDictToInit)
 
 
 
-    sprintf(options,"-Werror -D UNASSIGNED=%d  -D MAXPOPS=%d -D MISSING=%d \
-            -D MAXALLELES=%d -D NUMLOCI=%d  -D LINES=%d    \
-            -D NUMINDS=%d -D MAXRANDOM=%d  -D USEPOPINFO=%d    \
-            -D LOCPRIOR=%d  -D NOTAMBIGUOUS=%d  -D NUMLOCATIONS=%d    \
-            -D PFROMPOPFLAGONLY=%d -D FREQSCORR=%d -D blockSize=64\
-            -D DEBUGCOMPARE=%d -D FPRIORMEAN=%f -D FPRIORSD=%f -D NOADMIX=%d \
-            -D NOALPHA=%d -DMAXGROUPS=%d "
+
+
+		sprintf(options,"-D UNASSIGNED=%d -D MAXPOPS=%d -D MISSING=%d -D MAXALLELES=%d -D NUMLOCI=%d -D LINES=%d -D NUMINDS=%d -D MAXRANDOM=%d -D USEPOPINFO=%d -D LOCPRIOR=%d -D NOTAMBIGUOUS=%d -D NUMLOCATIONS=%d -D PFROMPOPFLAGONLY=%d -D FREQSCORR=%d -D blockSize=64 -D DEBUGCOMPARE=%d -D FPRIORMEAN=%ff -D FPRIORSD=%ff -D NOADMIX=%d -D NOALPHA=%d -DMAXGROUPS=%d "
             , UNASSIGNED, MAXPOPS, MISSING
             , MAXALLELES, NUMLOCI, LINES
             , NUMINDS, MAXRANDOM, USEPOPINFO
@@ -729,12 +836,9 @@ int InitCLDict(CLDict *clDictToInit)
             , PFROMPOPFLAGONLY,FREQSCORR,DEBUGCOMPARE,
             FPRIORMEAN,FPRIORSD, NOADMIX,NOALPHA,MAXGROUPS);
     
-    sprintf(options + strlen(options), "-D ONEFST=%d -D ALPHAPROPSD=%f \
-        -D ALPHAMAX=%f \
-        -D UNIFPRIORALPHA=%d -D POPALPHAS=%d -D ALPHAPRIORA=%f \
-        -D ALPHAPRIORB=%f -D NUMALPHAS=%d -D ANCESTDIST=%d -D NUMBOXES=%d",
+		sprintf(options + strlen(options), "-D ONEFST=%d -D ALPHAPROPSD=%ff -D ALPHAMAX=%ff -D UNIFPRIORALPHA=%d -D POPALPHAS=%d -D ALPHAPRIORA=%ff -D ALPHAPRIORB=%ff -D NUMALPHAS=%d -D ANCESTDIST=%d -D NUMBOXES=%d -D USEGPU=%d -I Kernels -g",
         ONEFST,ALPHAPROPSD, ALPHAMAX, UNIFPRIORALPHA, POPALPHAS,
-        ALPHAPRIORA, ALPHAPRIORB, numalphas,ANCESTDIST,NUMBOXES);
+        ALPHAPRIORA, ALPHAPRIORB, numalphas,ANCESTDIST,NUMBOXES, USEGPU);
 
     printf("COMPILING KERNELS WITH:\n");
     printf("%s\n",options);
@@ -771,7 +875,7 @@ int dimLoc(int * dims, int * dimMaxs, int numDims)
 /*
  * Copies the entire last dimension over into localarr
  */
-void copyToLocal( double * globalArr, double *localArr,
+void copyToLocal( float * globalArr, float *localArr,
                   int * dims, int * dimMaxs, int numDims)
 {
     int i;
@@ -783,19 +887,9 @@ void copyToLocal( double * globalArr, double *localArr,
     dims[numDims-1] = origLastDim;
 }
 
-void finishCommands(CLDict *clDict, char * name)
-{
-    cl_int err;
-    char fmsg[120];
-    err = clFinish(clDict->commands);
-    strcpy(fmsg,"clFinish error: ");
-    strcat(fmsg,name);
-    strcat(fmsg,"!\n");
-    handleCLErr(err, clDict,fmsg);
-}
 
 /*
- * Reads the buffer fource from the gpu to the array dest
+ * Reads the buffer source from the GPU to the array dest
  */
 void readBuffer(CLDict *clDict, void * dest, size_t size, enum BUFFER source,
                 char *name)
@@ -807,9 +901,11 @@ void readBuffer(CLDict *clDict, void * dest, size_t size, enum BUFFER source,
     /*strcat(msg,name);*/
     /*strcat(msg,"!\n");*/
     /*finishCommands(clDict,msg);*/
+    cl_event event;
     err = clEnqueueReadBuffer(clDict->commands, clDict->buffers[source], CL_TRUE,
                               0,
-                              size, dest, 0, NULL, NULL );
+                              size, dest, clDict->num_events_in_waitlist, clDict->event_wait_list, NULL );
+    addToWaitList(clDict,event);
     strcpy(msg,"Failed to read buffer: ");
     strcat(msg,name);
     strcat(msg,"!\n");
@@ -829,10 +925,12 @@ void readBuffers(CLDict *clDict, void * dest[], size_t size[], enum BUFFER sourc
     /*strcat(msg,name);*/
     /*strcat(msg,"!\n");*/
     /*finishCommands(clDict,msg);*/
+    cl_event event;
     for(buff =0; buff < numbufferstoread; buff++){
         err = clEnqueueReadBuffer(clDict->commands, clDict->buffers[source[buff]], CL_FALSE,
                                   0,
-                                  size[buff], dest[buff], 0, NULL, NULL );
+                                  size[buff], dest[buff], clDict->num_events_in_waitlist, clDict->event_wait_list, NULL );
+        addToWaitList(clDict,event);
         strcpy(msg,"Failed to read buffer: ");
         strcat(msg,name[buff]);
         strcat(msg,"!\n");
@@ -846,29 +944,7 @@ void readBuffers(CLDict *clDict, void * dest[], size_t size[], enum BUFFER sourc
  * Writes the array source to the buffer dest on the GPU
  */
 
-void writeBuffer(CLDict *clDict, void * source, size_t size,
-                 enum BUFFER dest, char *name)
-{
-    cl_int err;
-    char msg[120];
 
-    /* apparently a blocking enqueue already does this */
-    /*strcpy(msg,"Prewrite finish error: ");*/
-    /*strcat(msg,name);*/
-    /*strcat(msg,"!\n");*/
-    /*finishCommands(clDict,msg);*/
-
-    err = clEnqueueWriteBuffer(clDict->commands, clDict->buffers[dest], CL_FALSE,
-                               0,
-                               size, source, 0, NULL, NULL );
-
-    strcpy(msg,"Failed to write buffer: ");
-    strcat(msg,name);
-    strcat(msg,"!\n");
-    handleCLErr(err, clDict,msg);
-    /*err = clFinish(clDict->commands);*/
-    /*handleCLErr(err, clDict,"clFinish error!\n");*/
-}
 
 
 void runKernel(CLDict *clDict, enum KERNEL kernel, int numdims, size_t *dims,
@@ -876,8 +952,11 @@ void runKernel(CLDict *clDict, enum KERNEL kernel, int numdims, size_t *dims,
 {
     cl_int err;
     char msg[120];
+    cl_event event;
     err = clEnqueueNDRangeKernel(clDict->commands, clDict->kernels[kernel],
-                                 numdims, NULL, dims, NULL, 0, NULL, NULL);
+                                 numdims, NULL, dims, NULL,
+                               clDict->num_events_in_waitlist, clDict->event_wait_list, NULL );
+    addToWaitList(clDict,event);
     strcpy(msg,"Failed to run kernel: ");
     strcat(msg,name);
     strcat(msg,"!\n");
@@ -890,7 +969,10 @@ void runTask(CLDict *clDict, enum KERNEL kernel, char *name)
 {
     cl_int err;
     char msg[120];
-    err = clEnqueueTask(clDict->commands, clDict->kernels[kernel],0, NULL,NULL) ;
+    cl_event event;
+    err = clEnqueueTask(clDict->commands, clDict->kernels[kernel],
+                               clDict->num_events_in_waitlist, clDict->event_wait_list, NULL );
+    addToWaitList(clDict,event);
     strcpy(msg,"Failed to run task: ");
     strcat(msg,name);
     strcat(msg,"!\n");

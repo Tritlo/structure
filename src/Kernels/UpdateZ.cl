@@ -1,7 +1,7 @@
-#include "Kernels/rand.cl"
+#include "rand.cl"
 __kernel void UpdateZ (
-    __global double* Q, /* input */
-    __global double* P,  /* input */
+    __global float* Q, /* input */
+    __global float* P,  /* input */
     __global int* Geno,/* input */
     __global uint* randGens, /*random numbers*/
     __global int* Z, /* output */
@@ -11,8 +11,8 @@ __kernel void UpdateZ (
     int allele;
     int pop;
     int line;
-    double Cutoffs[MAXPOPS];
-    double sum;
+    float Cutoffs[MAXPOPS];
+    float sum;
 
     int ind = get_global_id(0);
     RndDiscState randState[1];
@@ -28,7 +28,7 @@ __kernel void UpdateZ (
                     Z[ZPos (ind, line, loc)] = UNASSIGNED;
                 } else {
                     /*Data present */
-                    sum = 0.0;    /*compute prob of each allele being from each pop */
+                    sum = 0.0f;    /*compute prob of each allele being from each pop */
                     for (pop = 0; pop < MAXPOPS; pop++) {
                         Cutoffs[pop] = Q[QPos (ind, pop)] * P[PPos (loc, pop, allele)];
                         sum += Cutoffs[pop];

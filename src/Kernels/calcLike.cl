@@ -3,7 +3,7 @@
     cost of the algorithm while keeping the work complexity O(n) and the step complexity O(log n).
     (Brent's Theorem optimization)
 */
-__kernel void reduce(__global double *g_idata, __global double *g_odata, unsigned int n, __local volatile double *sdata)
+__kernel void reduce(__global float *g_idata, __global float *g_odata, unsigned int n, __local volatile float *sdata)
 {
     // perform first level of reduction,
     // reading from global memory, writing to shared memory
@@ -52,21 +52,21 @@ __kernel void reduce(__global double *g_idata, __global double *g_odata, unsigne
 
 
 
-double mapLogDiffsFunc(__global double *Q, __global double *TestQ,
-                       __global double *P, __global int *Geno,
+float mapLogDiffsFunc(__global float *Q, __global float *TestQ,
+                       __global float *P, __global int *Geno,
                        int ind, int loc)
 {
     int allele, line, pop;
-    double termP;
-    double termM;
+    float termP;
+    float termM;
     if (ind < NUMINDS && loc < NUMLOCI){
-        double runningtotalP = 1.0, runningtotalM = 1.0;
-        double logtermP = 0.0, logtermM = 0.0;
+        float runningtotalP = 1.0f, runningtotalM = 1.0f;
+        float logtermP = 0.0f, logtermM = 0.0f;
         for (line = 0; line < LINES; line++) {
             allele = Geno[GenPos (ind, line, loc)];
             if (allele != MISSING) {
-                termP = 0.0;
-                termM = 0.0;
+                termP = 0.0f;
+                termM = 0.0f;
                 for (pop = 0; pop < MAXPOPS; pop++) {
                     termP += TestQ[QPos(ind,pop)] * P[PPos (loc, pop, allele)];
                     termM += Q[QPos(ind,pop)] * P[PPos (loc, pop, allele)];
@@ -81,7 +81,7 @@ double mapLogDiffsFunc(__global double *Q, __global double *TestQ,
                 }
                 if (runningtotalP < SQUNDERFLO){
                     logtermP += log(runningtotalP);
-                    runningtotalP = 1.0;
+                    runningtotalP = 1.0f;
                 }
 
                 if (termM > SQUNDERFLO) {
@@ -91,7 +91,7 @@ double mapLogDiffsFunc(__global double *Q, __global double *TestQ,
                 }
                 if (runningtotalM < SQUNDERFLO){
                     logtermM += log(runningtotalM);
-                    runningtotalM = 1.0;
+                    runningtotalM = 1.0f;
                 }*/
                 //Might underflow?
                 logtermP += log(termP);
@@ -103,80 +103,105 @@ double mapLogDiffsFunc(__global double *Q, __global double *TestQ,
 
         return logtermP - logtermM;
     }
-    return 0.0;
+    return 0.0f;
 }
 
 
 
-__kernel void mapReduceLogDiffs(__global double *Q,
-                                __global double *TestQ,
-                                __global double *P,
+__kernel void mapReduceLogDiffs(__global float *Q,
+                                __global float *TestQ,
+                                __global float *P,
                                 __global int *Geno,
-                                __global double *logdiffs,
-                                __global double *results,
-                                __local  double *scratch)
+                                __global float *logdiffs,
+                                __global float *results,
+                                __local  float *scratch)
 {
-    int loc = get_global_id(0);
     int ind = get_global_id(1);
-    int numgroups = get_num_groups(0);
-    /* idempotent */
-    double logdiff = 0.0;
-    /* Map and partial reduce */
-    while( loc < NUMLOCI){
-        double elem = mapLogDiffsFunc(Q,TestQ,P,Geno,ind,loc);
-        logdiff += elem;
-        loc += get_global_size(0);
-    }
+    while (ind < NUMINDS){
+        int numgroups = get_num_groups(0);
+        int loc = get_global_id(0);
+        /* idempotent */
+        float logdiff = 0.0f;
+        float c,y,t;
+        /* Map and partial reduce */
+        c = 0.0f;
+        while( loc < NUMLOCI){
+            float elem = mapLogDiffsFunc(Q,TestQ,P,Geno,ind,loc);
+            y = elem -c;
+            t = logdiff+y;
+            c = (t - logdiff) - y;
+            logdiff = t;
+            loc += get_global_size(0);
+        }
 
-    /* reduce locally */
-    int localLoc = get_local_id(0);
-    scratch[localLoc] = logdiff;
-    barrier(CLK_LOCAL_MEM_FENCE);
-    int devs = get_local_size(0);
-    for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
-        if(localLoc < offset){
-            scratch[localLoc] += scratch[localLoc + offset];
-        }
-        //Handle if were not working on a multiple of 2
-        if (localLoc == 0 && (devs-1)/2 == offset){
-            scratch[localLoc] += scratch[devs-1];
-        }
-        devs >>= 1;
+        /* reduce locally */
+        int localLoc = get_local_id(0);
+        scratch[localLoc] = logdiff;
         barrier(CLK_LOCAL_MEM_FENCE);
-    }
+        int devs = get_local_size(0);
+        c = 0.0f;
+        for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
 
-    /* save result */
-    int gid = get_group_id(0);
-    if(localLoc == 0){
-        results[ind*numgroups +gid] = scratch[0];
-    }
+            if(localLoc < offset){
+                y = scratch[localLoc + offset] - c;
+                t = scratch[localLoc] + y;
+                c = (t-scratch[localLoc]) - y;
+                scratch[localLoc] = t;
+            }
+            //Handle if were not working on a multiple of 2
+            if (localLoc == 0 && (devs-1)/2 == offset){
+                y = scratch[devs-1] - c;
+                t = scratch[localLoc] + y;
+                c = (t-scratch[localLoc]) - y;
+                scratch[localLoc] = t;
+            }
 
-    /* reduce over the groups into final result */
-    barrier(CLK_GLOBAL_MEM_FENCE);
-    if(gid==0){
-        logdiffs[ind] = 0;
-        for(int id =0; id < numgroups; id ++){
-            logdiffs[ind] += results[ind*numgroups + id];
-            results[ind*numgroups + id] = 0;
+            devs >>= 1;
+            barrier(CLK_LOCAL_MEM_FENCE);
         }
+
+        /* save result */
+        int gid = get_group_id(0);
+        if(localLoc == 0){
+            results[ind*numgroups +gid] = scratch[0];
+        }
+
+        /* reduce over the groups into final result */
+        barrier(CLK_GLOBAL_MEM_FENCE);
+        if(gid==0){
+            logdiffs[ind] = 0;
+            for(int id =0; id < numgroups; id ++){
+                logdiffs[ind] += results[ind*numgroups + id];
+                results[ind*numgroups + id] = 0;
+            }
+        }
+        ind += get_global_size(1);
     }
 }
 
 /* copy of logdiffs, but calc only one item */
-double mapLogLikeFunc(__global double *Q, __global double *P,
+float mapLogLikeFunc(__global float *Q, __global float *P,
                        __global int *Geno, int ind, int loc)
 {
     int allele, line, pop;
-    double term;
+    float term;
     if (ind < NUMINDS && loc < NUMLOCI){
-        double runningtotal = 1.0;
-        double logterm = 0.0;
+        float runningtotal = 1.0f;
+        float logterm = 0.0f;
+        float c = 0.0f;
+        float y,t;
         for (line = 0; line < LINES; line++) {
             allele = Geno[GenPos (ind, line, loc)];
             if (allele != MISSING) {
-                term = 0.0;
+                term = 0.0f;
+                float d = 0.0f;
+                float z,u;
                 for (pop = 0; pop < MAXPOPS; pop++) {
-                    term += Q[QPos(ind,pop)] * P[PPos (loc, pop, allele)];
+
+                    z = Q[QPos(ind,pop)] * P[PPos (loc, pop, allele)] - d;
+                    u = term + z;
+                    d = (u - term) - z;
+                    term = u;
                 }
 
                 //TODO: Evaluate underflow safe vs nonsafe
@@ -189,100 +214,125 @@ double mapLogLikeFunc(__global double *Q, __global double *P,
                 }
                 if (runningtotal < SQUNDERFLO){
                     logterm += log(runningtotal);
-                    runningtotal = 1.0;
+                    runningtotal = 1.0f;
                 }*/
                 //Might underflow?
-                logterm += log(term);
+                y = log(term) - c;
+                t = logterm + y;
+                c = (t - logterm) -y;
+                logterm = t;
             }
         }
         logterm += log(runningtotal);
         return logterm;
     }
-    return 0.0;
+    return 0.0f;
 }
 
-__kernel void mapReduceLogLike(__global double *Q,
-                                __global double *P,
+__kernel void mapReduceLogLike(__global float *Q,
+                                __global float *P,
                                 __global int *Geno,
-                                __global double *loglikes,
-                                __global double *results,
-                                __local  double *scratch)
+                                __global float *loglikes,
+                                __global float *results,
+                                __local  float *scratch)
 {
     int ind = get_global_id(1);
-    int loc = get_global_id(0);
-    int numgroups = get_num_groups(0);
-    /* idempotent */
-    double logterm = 0.0;
-    /* Map and partial reduce */
-    /* clear results buffer */
-    if (ind < NUMINDS && loc < NUMLOCI){
-        while( loc < NUMLOCI){
-            double elem = mapLogLikeFunc(Q,P,Geno,ind,loc);
-            logterm += elem;
-            loc += get_global_size(0);
-        }
+    while (ind < NUMINDS){
+        int loc = get_global_id(0);
+        int numgroups = get_num_groups(0);
+        /* idempotent */
+        float logterm = 0.0f;
+        float c,y,t;
+        /* Map and partial reduce */
+        /* clear results buffer */
 
-        /* reduce locally */
-        int localLoc = get_local_id(0);
-        scratch[localLoc] = logterm;
-        barrier(CLK_LOCAL_MEM_FENCE);
-        int devs = get_local_size(0);
-        for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
-            if(localLoc < offset){
-                scratch[localLoc] += scratch[localLoc + offset];
+        if (ind < NUMINDS && loc < NUMLOCI){
+            c = 0.0f;
+            while( loc < NUMLOCI){
+                float elem = mapLogLikeFunc(Q,P,Geno,ind,loc);
+                y = elem - c;
+                t = logterm + y;
+                c = (t - logterm) - y;
+                logterm = t;
+                loc += get_global_size(0);
             }
-            //Handle if were not working on a multiple of 2
-            if (localLoc == 0 && (devs-1)/2 == offset){
-                scratch[localLoc] += scratch[devs-1];
-            }
-            devs >>= 1;
+
+            /* reduce locally */
+            int localLoc = get_local_id(0);
+            scratch[localLoc] = logterm;
             barrier(CLK_LOCAL_MEM_FENCE);
-        }
+            int devs = get_local_size(0);
+            c = 0.0f;
+            for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
+                if(localLoc < offset){
+                    y = scratch[localLoc + offset] - c;
+                    t = scratch[localLoc] + y;
+                    c = (t-scratch[localLoc]) - y;
+                    scratch[localLoc] = t;
+                }
+                //Handle if were not working on a multiple of 2
+                if (localLoc == 0 && (devs-1)/2 == offset){
+                    y = scratch[devs-1] - c;
+                    t = scratch[localLoc] + y;
+                    c = (t-scratch[localLoc]) - y;
+                    scratch[localLoc] = t;
+                }
 
-        /* save result */
-        int gid = get_group_id(0);
-        if(localLoc == 0){
-            /*results[ind*numgroups +gid] = 1;*/
-            results[ind*numgroups +gid] = scratch[0];
-        }
+                devs >>= 1;
+                barrier(CLK_LOCAL_MEM_FENCE);
+            }
 
-        /* reduce over the groups into final result */
-        barrier(CLK_GLOBAL_MEM_FENCE);
-        if(gid==0){
-            loglikes[ind] = 0;
-            for(int id =0; id < numgroups; id ++){
-                loglikes[ind] += results[ind*numgroups + id];
-                results[ind*numgroups + id] = 0;
+            /* save result */
+            int gid = get_group_id(0);
+            if(localLoc == 0){
+                /*results[ind*numgroups +gid] = 1;*/
+                results[ind*numgroups +gid] = scratch[0];
+            }
+
+            /* reduce over the groups into final result */
+            barrier(CLK_GLOBAL_MEM_FENCE);
+            if(gid==0){
+                loglikes[ind] = 0;
+                for(int id =0; id < numgroups; id ++){
+                    loglikes[ind] += results[ind*numgroups + id];
+                    results[ind*numgroups + id] = 0;
+                }
             }
         }
+        ind += get_global_size(1);
     }
 }
 
 __kernel void CalcLike(
-        __global double *loglikes,
-        __global double *indlike_norm,
-        __global double *sumindlike,
+        __global float *loglikes,
+        __global float *indlike_norm,
+        __global float *sumindlike,
         const int usesumindlike, /* this is true after burnin */
-        __global double *loglike,
-        __global double *results,
-        __local  double *scratch
+        __global float *loglike,
+        __global float *results,
+        __local  float *scratch
         )
 {
     int ind = get_global_id(0);
 
-    double logterm = 0.0;
+    float logterm = 0.0f;
     int numgroups = get_num_groups(0);
+    float c,y,t;
 
     /* Map and partial reduce */
+    c = 0.0f;
     while( ind < NUMINDS){
-        double elem = loglikes[ind];
+        float elem = loglikes[ind];
         if (usesumindlike) {
-            if (indlike_norm[ind]==0.0) {
+            if (indlike_norm[ind]==0.0f) {
                 indlike_norm[ind] = elem;
             }
             sumindlike[ind] += exp(elem-indlike_norm[ind]);
         }
-        logterm += elem;
+        y = elem - c;
+        t = logterm + y;
+        c = (t - logterm) - y;
+        logterm = t;
         ind += get_global_size(0);
     }
 
@@ -290,14 +340,22 @@ __kernel void CalcLike(
     scratch[localLoc] = logterm;
     barrier(CLK_LOCAL_MEM_FENCE);
     int devs = get_local_size(0);
+    c = 0.0f;
     for(int offset = get_local_size(0) /2; offset > 0; offset >>= 1){
         if(localLoc < offset){
-            scratch[localLoc] += scratch[localLoc + offset];
+            y = scratch[localLoc + offset] - c;
+            t = scratch[localLoc] + y;
+            c = (t-scratch[localLoc]) - y;
+            scratch[localLoc] = t;
         }
         //Handle if were not working on a multiple of 2
         if (localLoc == 0 && (devs-1)/2 == offset){
-            scratch[localLoc] += scratch[devs-1];
+            y = scratch[devs-1] - c;
+            t = scratch[localLoc] + y;
+            c = (t-scratch[localLoc]) - y;
+            scratch[localLoc] = t;
         }
+
         devs >>= 1;
         barrier(CLK_LOCAL_MEM_FENCE);
     }

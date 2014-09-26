@@ -103,13 +103,13 @@ void GetNumFromPops (int *NumAFromPops, int *Geno, int *Z, int *NumAlleles,
  * O(NUMLOCI*(MAXPOPS* (max_loc NumAlleles[loc]) + NUMINDS*LINES)) =>
  * O(NUMLOCI*(MAXPOPS*MAXALLELES + NUMINDS*LINES))
  */
-void UpdateP (double *P,  double *Epsilon, double *Fst,
-              int *NumAlleles, int *Geno, int *Z, double *lambda, struct IND *Individual,
-              double * randomArr)
+void UpdateP (float *P,  float *Epsilon, float *Fst,
+              int *NumAlleles, int *Geno, int *Z, float *lambda, struct IND *Individual,
+              float * randomArr)
 /*Simulate new allele frequencies from Dirichlet distribution */
 {
     int loc, pop, allele;
-    double *Parameters;           /*[MAXALLS] **Parameters of posterior on P */
+    float *Parameters;           /*[MAXALLS] **Parameters of posterior on P */
     /*int *NumAFromPop;             [>[MAXPOPS][MAXALLS] **number of each allele from each pop <]*/
 
     int *NumAFromPops;/*[NUMLOCI][MAXPOPS][MAXALLS] **number of each allele from each pop at each loc */
@@ -117,7 +117,7 @@ void UpdateP (double *P,  double *Epsilon, double *Fst,
 
     RndDiscState randState[1];
 
-    Parameters = calloc(MAXALLELES, sizeof (double));
+    Parameters = calloc(MAXALLELES, sizeof (float));
     /*NumAFromPop = calloc(MAXPOPS * MAXALLELES, sizeof (int));*/
 
     NumAFromPops = calloc(NUMLOCI*MAXPOPS * MAXALLELES, sizeof (int));
@@ -199,10 +199,10 @@ void UpdateP (double *P,  double *Epsilon, double *Fst,
 }
 
 
-void UpdatePCL (CLDict *clDict,double *P,  double *Epsilon,
-                double *Fst,
-                int *NumAlleles, int *Geno, int *Z, double *lambda, struct IND *Individual,
-                double * randomArr)
+void UpdatePCL (CLDict *clDict,float *P,  float *Epsilon,
+                float *Fst,
+                int *NumAlleles, int *Geno, int *Z, float *lambda, struct IND *Individual,
+                float * randomArr)
 /*Simulate new allele frequencies from Dirichlet distribution */
 {
 
@@ -215,8 +215,12 @@ void UpdatePCL (CLDict *clDict,double *P,  double *Epsilon,
     /*NumAFromPops = calloc(NUMLOCI*MAXPOPS * MAXALLELES, sizeof (int));*/
     error[0] = 0;
     error[1] = 0;
-    global[0] = NUMINDS;
-    global[1] = NUMLOCI;
+    global[0] = fmin(MAXDIM,NUMINDS);
+    global[1] = fmin(MAXDIM,NUMLOCI);
+    /* if (ONLYONEDIM){ */
+    /*     global[0] = 1; */
+    /*     global[1] = 1; */
+    /* } */
 
     /*
      * GetNumFromPops writes
@@ -241,7 +245,7 @@ void UpdatePCL (CLDict *clDict,double *P,  double *Epsilon,
 
 
 
-    /*writeBuffer(clDict,randomArr, sizeof(double) * NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM,RANDCL,"randomArr");*/
+    /*writeBuffer(clDict,randomArr, sizeof(float) * NUMLOCI*MAXALLELES*MAXPOPS*MAXRANDOM,RANDCL,"randomArr");*/
 
 
     /* =================================================== */
@@ -251,8 +255,12 @@ void UpdatePCL (CLDict *clDict,double *P,  double *Epsilon,
     runKernel(clDict,GetNumFromPopsKernel,2,global,"GetNumFromPops");
 
 
-    global[0] = NUMLOCI;
-    global[1] = MAXPOPS;
+    global[0] = fmin(MAXDIM,NUMLOCI);
+    global[1] = fmin(MAXDIM,MAXPOPS);
+    /* if (ONLYONEDIM){ */
+    /*     global[0] = 1; */
+    /*     global[1] = 1; */
+    /* } */
 
     runKernel(clDict,UpdatePKernel,2,global,"UpdateP");
 

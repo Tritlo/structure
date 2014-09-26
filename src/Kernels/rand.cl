@@ -1,19 +1,19 @@
-#include "Kernels/randGen.cl"
+#include "/home/structure/structure/src/Kernels/randGen.cl"
 
 __kernel void Dirichlet(
-        __global double *Parameters,
+        __global float *Parameters,
         __global uint *randGens,
-        __global double *TestQ)
+        __global float *TestQ)
 {
     int ind = get_global_id(0);
     RndDiscState randState[1];
 
     while (ind < NUMINDS){
         initRndDiscState(randState,randGens,ind);
-        double GammaSample[MAXPOPS];
+        float GammaSample[MAXPOPS];
 
         int i = 0;
-        double sum = 0.0;
+        float sum = 0.0f;
         int offset = ind*MAXPOPS;
         for(i = 0; i < MAXPOPS; i++){
             GammaSample[i] = RGammaDisc(Parameters[i],1,randState);
@@ -29,38 +29,40 @@ __kernel void Dirichlet(
 
 
 __kernel void FillArrayWRandom(
-        __global double *randomArr,
+        __global float *randomArr,
         __global uint *randGens,
         const int length
         )
 {
     int pos = get_global_id(0);
-    mwc64x_state_t rng = getRandGen(randGens,pos);
+    /* uint rng = getRandGen(randGens,pos); */
     uint i;
-    double val;
+    float val;
     ulong samplesPerstream = length/get_global_size(0);
-    uint offset = pos*samplesPerstream;
+    int offset = pos*samplesPerstream;
+    RndDiscState randState[1];
+    initRndDiscState(randState,randGens,pos);
     if (offset < length){
         for(i = 0; i < samplesPerstream && i+offset < length; i++){
-            randomArr[offset+i] = uintToUnit(MWC64X_NextUint(&rng));
+            randomArr[offset+i] = uintToUnit(getRandUint(randState));
         }
-        saveRandGen(randGens,pos,rng);
+        saveRandGen(randGens,pos,randState);
     }
 }
 
 __kernel void PopNormals(
-        __global double *Prev,
-        __global double *norms,
+        __global float *Prev,
+        __global float *norms,
         __global uint *randGens,
-        const double SD,
+        const float SD,
         const int length)
 {
     RndDiscState randState[1];
     initRndDiscState(randState,randGens,0);
     int i;
     for( i=0; i < length; i+= 2){
-        double2 rnorms = BoxMuller(randState);
-        double oldf;
+        float2 rnorms = BoxMuller(randState);
+        float oldf;
         oldf = Prev[i];
         norms[i] = rnorms.x*SD + oldf;
 
