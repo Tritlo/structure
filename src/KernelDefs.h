@@ -11,7 +11,7 @@
 #define USEGPU 0
 /* #else */
 #if !USEGPU
-#define MAXDIM 1
+#define MAXDIM 4
 #else
 #define MAXDIM 128
 #endif

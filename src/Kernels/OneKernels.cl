@@ -32,8 +32,17 @@
 #define RANDGEN
 /* #define MAXRANDVAL 4294967296 */
 /* #define MAXRANDVAL 281474976710656 */
-#define MAXRANDVAL 2147483647
-#define RANDSPERSTREAM 2147483648
+#define PM_m_FP   (2147483647.0)
+#define PM_min    1
+#define PM_max    2147483646
+#define PM_k      (4.6566128752457969241058E-10) // 1/(2^31-1)
+#define PM_m     2147483647
+#define PM_a     16807
+#define PM_q     127773         // (PM_m div PM_a)
+#define PM_r     2836           // (PM_m mod PM_a)
+
+/* #define MAXRANDVAL 2147483647 */
+/* #define RANDSPERSTREAM 2147483648 */
 #define PI 3.14159265359f
 
 
@@ -45,7 +54,7 @@ void saveRandGen(__global uint *randGens, int randGen,uint rng){
 }
 
 float uintToUnit(uint rnduint){
-   return (float) rnduint / MAXRANDVAL;
+   return (float) rnduint / PM_max;
 }
 
 
@@ -57,30 +66,6 @@ __kernel void InitRandGens( __global uint *randGens, const int baseOffset)
     /* saveRandGen(randGens,pos,rng); */
 }
 
-/*#if DEBUGCOMPARE
-typedef struct RndDiscState {
-    __global float *randomArr;
-    int randomValsTaken;
-    int baseOffset;
-} RndDiscState;
-
-
-void initRndDiscState(RndDiscState *state,__global float * randomArr, int offset)
-{
-    state->randomArr = randomArr;
-    state->maxrandom = maxrandom;
-    state->baseOffset = offset;
-    state->randomValsTaken = 0;
-}
-
-float rndDisc(RndDiscState * state)
-{
-    float val;
-    val = state->randomArr[state->baseOffset + state->randomValsTaken];
-    state->randomValsTaken++;
-    return val;
-}
-#else*/
 typedef struct RndDiscState {
     __global uint *randGens;
     int randGenId;
@@ -94,23 +79,18 @@ void initRndDiscState(RndDiscState *state, __global uint * randGens, int id)
     state->rng = getRandGen(randGens,id);
 }
 
+
 uint rndUInt(RndDiscState *state){
-    /* Drand 48 */
-    /* const unsigned int a = 25214903917; */
-    /* const unsigned int c = 11; */
-    /* const unsigned int m = 281474976710656 -1; */
-    /* GGL */
-    const uint a = 16807;
-    const uint c = 0;
-    const uint m = 2147483647;
-    uint x = state->rng;
-    /* uint xn = (a*x + c) % m; */
-    /* uint xn = (a*x + c) & m; */
-    uint xn = a*x % m;
-    state->rng = xn;
-    /* printf("%d, id: %d\n",xn,state->randGenId); */
-    /* printf("%d, %d\n",get_global_id(0),get_global_id(1)); */
-    return xn;
+    /* Park Miller, taken from https://github.com/vadimdi/PRNGCL */
+    uint PM_test_1, PM_test_2;
+
+    PM_test_1 = ((uint) PM_a) * ((state->rng) % PM_q);
+    PM_test_2 = ((uint) PM_r) * ((state->rng) / PM_q);
+    if (PM_test_1 > PM_test_2)
+        (state->rng) = PM_test_1 - PM_test_2;
+    else
+        (state->rng) = PM_test_1 - PM_test_2 + (uint) PM_m;
+    return state->rng;
 }
 
 /* uint rndUInt(RndDiscState *state){ */
@@ -121,8 +101,15 @@ float rndDisc(RndDiscState * state)
 {
     /* uint rand = rndUInt(state); */
     /* float val = uintToUnit(rand); */
+    uint rnd1, rnd2;
+    rnd1 = rndUInt(state);
+    rnd2 = rndUInt(state);
+    const float k = PM_k;
+    const float rnd_min = PM_min;
+    const float rnd_max = PM_max;
+    float val = (rnd1 + k * rnd2 - (rnd_min + k * rnd_max)) / ((rnd_max - rnd_min) * (1.0 - k));
     /* printf("%f\n",val); */
-    return uintToUnit(rndUInt(state));
+    return val;
 }
 
 /* uint rndUInt(RndDiscState * state) */
@@ -179,16 +166,16 @@ inline void AtomicAdd(volatile __global float *source, const float operand) {
 /*
  * returns a random real in the [lower,upper)
  */
-float randomReal(float lower, float upper,RndDiscState *randState)
-{
-    uint randVal;
-    float randPercent;
-    float random;
+/* float randomReal(float lower, float upper,RndDiscState *randState) */
+/* { */
+/*     uint randVal; */
+/*     float randPercent; */
+/*     float random; */
 
-    randVal = rndUInt(randState);
-    randPercent = (float) randVal/(RAND_MAX +1);
-    return (lower + randPercent*(upper-lower));
-}
+/*     randVal = rndUInt(randState); */
+/*     randPercent = (float) randVal/(RAND_MAX +1); */
+/*     return (lower + randPercent*(upper-lower)); */
+/* } */
 
 float numToRange(float low, float high, float num)
 {
@@ -615,7 +602,7 @@ __kernel void FillArrayWRandom(
     initRndDiscState(randState,randGens,pos);
     if (offset < length){
         for(i = 0; i < samplesPerstream && i+offset < length; i++){
-            randomArr[offset+i] = uintToUnit(rndUInt(randState));
+            randomArr[offset+i] = rndDisc(randState);
         }
         saveRandGen(randGens,pos,randState);
     }
